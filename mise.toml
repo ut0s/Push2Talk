@@ -1,0 +1,44 @@
+[env]
+TMUX_WINDOW_TITLE = "p2talk"
+
+[tasks.tmux]
+description = "Rename the current window, split panes, and execute development commands"
+run = """
+#!/bin/bash
+
+# Ensure this command is run within a TMux session
+if [ -z "$TMUX" ]; then
+  echo "Error: This command must be run inside a TMux session."
+  exit 1
+fi
+
+PROJECT_DIR="$(pwd -P)"
+# Target the pane running this task, not the active pane of the client,
+# so switching windows/panes during startup does not misdirect commands
+ORIGINAL_PANE_ID="$TMUX_PANE"
+
+# Rename the window that owns this pane
+tmux rename-window -t "$ORIGINAL_PANE_ID" "$TMUX_WINDOW_TITLE"
+
+# Start agy in the original pane (top)
+tmux send-keys -t "$ORIGINAL_PANE_ID" "agy" C-m
+
+# Split below the original pane without moving focus (-d)
+tmux split-window -d -v -l 50% -t "$ORIGINAL_PANE_ID" -c "$PROJECT_DIR"
+"""
+
+[tasks.test]
+description = "Run Swift tests"
+run = "swift test --scratch-path .build --cache-path .build/cache"
+
+[tasks.bundle]
+description = "Build the local app bundle"
+run = "bash scripts/build-app.sh"
+
+[tasks.prepare-release]
+description = "Prepare Universal app and Homebrew Cask locally"
+run = "bash scripts/release-homebrew.sh --prepare"
+
+[tasks.release]
+description = "Publish app and Cask to the dedicated public repository"
+run = "bash scripts/release-homebrew.sh"
