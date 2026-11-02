@@ -182,7 +182,7 @@ public enum L10n {
     "macOSのキーボード設定を開く": "Open macOS Keyboard Settings",
     "初期設定を完了・権限を再確認": "Complete Setup & Check Permissions",
     "入力終了後の動作": "After Dictation",
-    "通常は終了後にEnterを送る": "Send Enter after dictation by default",
+    "終了後にEnterを送る": "Send Enter after dictation",
     "右Optionを離す瞬間に、左右どちらかのShiftを押していると、その回だけEnter送信のオン／オフを反転します。設定自体は変わりません。": "Holding either Shift key when you release Right Option reverses the Enter setting for that session only. The saved setting does not change.",
     "例：上の設定がオフ（初期値）の場合\n・Shiftなしで右Optionを離す → 文字だけを入力\n・Shiftを押したまま右Optionを離す → 文字を入力してEnterを送信": "Example with the setting off (default):\n• Release Right Option without Shift → Insert text only\n• Release Right Option while holding Shift → Insert text and send Enter",
     "例：上の設定がオンの場合\n・Shiftなしで右Optionを離す → 文字を入力してEnterを送信\n・Shiftを押したまま右Optionを離す → 文字だけを入力": "Example with the setting on:\n• Release Right Option without Shift → Insert text and send Enter\n• Release Right Option while holding Shift → Insert text only",

@@ -62,7 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     pauseItem = menu.addItem(withTitle: paused ? L10n.text("再開") : L10n.text("一時停止"), action: #selector(togglePause), keyEquivalent: "")
     menu.addItem(withTitle: L10n.text("設定・初期設定…"), action: #selector(showSettings), keyEquivalent: ",")
     let quick = NSMenu()
-    addQuickToggle("通常は終了後にEnterを送る", value: settings.sendEnter, to: quick) { [weak self] in
+    addQuickToggle("終了後にEnterを送る", value: settings.sendEnter, to: quick) { [weak self] in
       guard let self else { return }
       self.cancel()
       self.settings.sendEnter.toggle()
@@ -395,7 +395,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     shortcut.addArrangedSubview(NSButton(title: L10n.text("初期設定を完了・権限を再確認"), target: self, action: #selector(completeSetup)))
 
     let behavior = layout.section(L10n.text("入力終了後の動作"), in: input)
-    let enter = NSButton(checkboxWithTitle: L10n.text("通常は終了後にEnterを送る"), target: self, action: #selector(changeEnter(_:)))
+    let enter = NSButton(checkboxWithTitle: L10n.text("終了後にEnterを送る"), target: self, action: #selector(changeEnter(_:)))
     settingsControls["enter"] = enter
     enter.state = settings.sendEnter ? .on : .off
     behavior.addArrangedSubview(enter)
