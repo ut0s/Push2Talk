@@ -57,7 +57,7 @@ mise run release
 
 別の配布先は`P2T_PUBLIC_REPO=OWNER/homebrew-NAME`、
 ブランチは`P2T_PUBLIC_BRANCH`で指定できます。
-バージョンは`packaging/Info.plist`だけで管理します。環境変数による上書きは禁止し、`P2T_VERSION`が設定されている場合はエラーで停止します。
+バージョンは`packaging/Info.plist`だけで管理します。`P2T_VERSION`が設定されていても使用しません。
 `mise run prepare-release --skip-checks`または`mise run release --skip-checks`はSwiftテストだけを省略し、ビルドと署名検証は必ず実行します。
 
 同じバージョンで再実行すると、既存のZIPをダウンロードし、そのSHA-256でCaskを生成します。

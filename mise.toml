@@ -65,7 +65,6 @@ run = '''
 #!/bin/bash
 set -euo pipefail
 
-[[ "${P2T_VERSION+x}" != x ]] || { echo 'P2T_VERSION is no longer supported. Use mise run bump:patch to update packaging/Info.plist.' >&2; exit 1; }
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' packaging/Info.plist)"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'CFBundleShortVersionString must be x.y.z' >&2; exit 1; }
 app="$PWD/dist/Push2Talk.app"
@@ -329,7 +328,6 @@ done
 
 public_repo="${P2T_PUBLIC_REPO:-ut0s/homebrew-push2talk}"
 public_branch="${P2T_PUBLIC_BRANCH:-main}"
-[[ "${P2T_VERSION+x}" != x ]] || { echo 'P2T_VERSION is no longer supported. Use mise run bump:patch to update packaging/Info.plist.' >&2; exit 1; }
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' packaging/Info.plist)"
 [[ "$public_repo" =~ ^[A-Za-z0-9_-]+/homebrew-[A-Za-z0-9_-]+$ ]] || die 'Expected OWNER/homebrew-NAME.'
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die 'Expected x.y.z version.'

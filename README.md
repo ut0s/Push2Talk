@@ -95,7 +95,7 @@ mise run build-install
 ## バージョン管理
 
 バージョンの唯一の管理元は`packaging/Info.plist`の`CFBundleShortVersionString`です。
-環境変数によるバージョン上書きは禁止です。`P2T_VERSION`による上書き機能は削除しており、設定されている場合はビルド・リリースをエラーで停止します。
+`P2T_VERSION`による上書き機能は削除しており、環境変数が設定されていても使用しません。
 
 ```sh
 mise run bump:patch  # Increment patch: 0.1.0 -> 0.1.1
