@@ -350,14 +350,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     guard statusLine != nil else { return }
     let title: String
     let symbol: String
-    if !AXIsProcessTrusted() {
+    if paused {
+      title = L10n.text("一時停止中")
+      symbol = "pause.fill"
+    } else if !AXIsProcessTrusted() {
       title = L10n.text("アクセシビリティ権限が必要です")
       symbol = "mic.slash"
     } else if !CGPreflightPostEventAccess() {
       title = L10n.text("キー送信の権限が必要です")
-      symbol = "mic.slash"
-    } else if paused {
-      title = L10n.text("一時停止中")
       symbol = "mic.slash"
     } else if !settings.setupComplete {
       title = L10n.text("初期設定を完了してください")
@@ -387,15 +387,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     statusLine.title = title
     // Reflect the physical hold immediately, including while Dictation is stopping or settling.
     let heldSymbol = symbol == "mic.slash" ? "mic" : symbol
-    let displaySymbol = settings.statusDisplayMode.showsMenuBarStatus
-      ? (keyboard.isRightOptionHeld ? heldSymbol : "mic.slash") : "mic"
+    let displaySymbol = paused ? "pause.fill" : (settings.statusDisplayMode.showsMenuBarStatus
+      ? (keyboard.isRightOptionHeld ? heldSymbol : "mic.slash") : "mic")
     statusItem.button?.image = settings.menuBarIcon.image(symbol: displaySymbol, description: title)
     statusItem.button?.attributedTitle = NSAttributedString(
       string: displaySymbol == "mic.fill" ? settings.recordingText.menuBarTitle : "",
       attributes: [.foregroundColor: NSColor.systemRed])
     statusItem.button?.toolTip = "Push2Talk: \(title)"
     let popupState: StatusPopup.State?
-    if settings.statusDisplayMode.showsPopup && symbol != "mic.slash" {
+    if !paused && settings.statusDisplayMode.showsPopup && symbol != "mic.slash" {
       switch session.phase {
       case .recording, .stopping: popupState = .recording
       case .settling: popupState = .settling

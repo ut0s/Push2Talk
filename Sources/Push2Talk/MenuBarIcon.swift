@@ -12,7 +12,25 @@ enum MenuBarIcon: String, CaseIterable {
   }
 
   func image(symbol: String = "mic", description: String) -> NSImage? {
-    guard let base = baseImage(symbol: symbol, description: description) else { return nil }
+    guard let base = baseImage(
+      symbol: symbol == "pause.fill" ? "mic" : symbol, description: description) else { return nil }
+    if symbol == "pause.fill" {
+      let paused = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
+        base.draw(in: NSRect(x: 0, y: 0, width: 18, height: 18))
+        // Clear space behind the pause badge so its bars remain distinct from the device.
+        NSColor.clear.setFill()
+        NSRect(x: 10, y: 0, width: 8, height: 10).fill(using: .copy)
+        NSColor.black.setFill()
+        for x: CGFloat in [11, 15] {
+          NSBezierPath(roundedRect: NSRect(x: x, y: 1, width: 2, height: 8),
+                       xRadius: 0.5, yRadius: 0.5).fill()
+        }
+        return true
+      }
+      paused.isTemplate = true
+      paused.accessibilityDescription = description
+      return paused
+    }
     guard symbol == "mic.fill" else { return base }
     // Use a non-template red icon and a recording dot to make an active session unmistakable.
     let active = NSImage(size: NSSize(width: 28, height: 18), flipped: false) { _ in
