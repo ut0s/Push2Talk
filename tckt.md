@@ -824,3 +824,64 @@ AltTabAltを参考にして
 ### Comments
 - 右Option解放通知の取りこぼしで最大60秒継続する経路に対し、25ms周期で物理キー状態を照合して解放を補完し、解放処理を開始条件ガードより先に実行するよう修正。通知欠落時の停止・重複抑制・Shift動作・監視終了時の破棄の回帰テスト追加。swift test --disable-sandbox（/tmpのscratch/cache使用）全40件成功、実行ファイルのビルドとgit diff --check成功。実際のmacOS音声入力・インストール済みアプリでの動作は未確認、アプリ差し替えやリリースは未実施。
 
+## [IN_REVIEW] 相談
+- ID: T-209a16ebf8b54f2b940b76d169a01954
+- CodexPrompt: 3c80792b0e401be77a3fcc706f2cdcf0c8cfa21beb6e732566d9cc6a413c00a4
+- CodexSession: 40e1242544262b65005cd3660f5a283cbb84bbd4d39968babadb8530b6a53d2c
+- Created: 2026-11-02
+- Source: Codex
+- Type: Discussion
+
+```text
+相談
+
+AltTabAltでアプリケーションのWindowsがないはずだが、表示されてしまうアプリがある
+Push2Talkもそう
+
+これはなんとかして防ぐことできないか？
+
+```
+
+<!-- tckt-subtask:5bc2a828f985625ecbd4ece00f56fa35988a6132354b03b241f85dd477ff8fe3 -->
+- [ ] [Task] Push2Talkで、閉じた設定ウィンドウを破棄する Push2Talk側で原因候補を減らせる
+
+```text
+Push2Talkで、閉じた設定ウィンドウを破棄する	Push2Talk側で原因候補を減らせる
+AltTabAltの判定を改善する	他のアプリにも対応できる。最小化・別デスクトップ・Stage Managerとの区別が必要
+
+それぞれ対応を進めたいです
+
+
+```
+
+### Comments
+- 相談として調査。インストール済AltTabAlt 1.0.14のBuildCommitは手元HEAD 68651ebと一致。Push2Talkはaccessory/LSUIElement設定済み、設定窓を閉じても保持。AltTabAltはSpaceなしでもAXに残る窓をStage Manager救済として採用するため誤表示の候補。ブラックリストによる即時回避、Push2Talk側で閉じた設定窓を破棄、AltTabAlt側で閉鎖窓と別Space/最小化/Stage Managerを区別する改善を提案。コード・設定変更および実機再現確認は未実施。
+- [Task] 両リポジトリに実装。Push2TalkはNSWindowDelegateで閉じた設定窓・コントロール・権限UIの参照を解放し言語変更時も同経路に統一。AltTabAltは全画面の現在Spaceと成功したAX一覧を照合し、現在Spaceに残る閉鎖窓を除外、別SpaceのChromium窓・最小化・非表示・Stage Manager相当窓を保持、AX失敗/ID不明は未取得として扱う。Push2Talk全45テストと隔離AppKit検証（weak参照解放、CG残存窓alpha=0、再表示・選択タブ・言語変更時の位置復元）、AltTabAlt追加5テストと両diff check成功。他チャットの権限再起動変更は保持。インストール済アプリは未更新、実際のStage Manager/複数Space操作と権限付きAltTabAltでの統合確認は未実施。
+
+## [IN_REVIEW] 権限付与されたタイミングで、自動的に再起動したほうが良くないでしょうか？
+- ID: T-60098e14a72646cabd16f5779520e84c
+- CodexPrompt: 8fda5ed9a9d00e45810b8a2f650205404922c9915cef5f8e046294c312e38f03
+- CodexSession: 77e36a8c3c6c55bd71cf3e51c3a1247737ed8c73b7e1e6d78faa0d41a3706fd9
+- Created: 2026-11-02
+- Source: Codex
+- Type: Discussion
+
+```text
+権限付与されたタイミングで、自動的に再起動したほうが良くないでしょうか？
+
+```
+
+<!-- tckt-subtask:0cf1e328ed615a721e75adf77f2f53d70b79011f9e2a9926353186d9ae764b71 -->
+- [ ] [Task] では、提案手法でお願いします
+
+```text
+では、提案手法でお願いします
+
+再起動して権限を反映は、すでにあるRe-checkのボタンがそれにあたりませんか？
+
+```
+
+### Comments
+- 現行コードを確認。0.8秒ごとの権限確認とキー監視開始はあるが自動再起動はなく、「権限を再確認」は別プロセス起動で再起動する。許可状態の変化を検知し、必要な許可が揃った後に短い案内を出して一度だけ再起動し設定へ復帰する設計を提案。入力監視の個別許可は必須にせず、入力中の再起動回避とループ防止、検知できない場合の手動再起動導線を維持する。相談のみでコード変更・実機検証なし。
+- [Task] 権限付与検知後の自動再起動を実装。必要権限が揃い、セッションとキー入力が落ち着いた後に2秒間案内して既存Re-check処理で再起動し設定へ復帰。一時停止を保持。起動時の許可済み状態は基準値として扱い、1プロセス1回の試行でループ防止。既存ボタンの表示・手動導線を維持。入力延期・権限取消・複数許可統合・再起動後基準値の5テストを追加し、swift test（/tmpキャッシュ、--disable-sandbox）で全スイートとアプリのビルド成功、git diff --check成功。OS設定での実際の権限付与・再起動とインストールは未実施。並行する設定ウィンドウ解放の変更は保持。
+
