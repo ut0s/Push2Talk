@@ -5,6 +5,55 @@ import XCTest
 
 final class KeyboardBridgeTests: XCTestCase {
   @MainActor
+  func testSystemPollingKeepsSessionRecordingWhenShortcutClearsOptionFlags() async {
+    for physicalKey in [CGKeyCode(58), CGKeyCode(61)] {
+      var keys: Set<CGKeyCode> = [physicalKey]
+      var flags = CGEventFlags(rawValue: 0x80140)
+      let bridge = KeyboardBridge(stateSource: KeyboardStateSource(
+        keyState: { keys.contains($0) }, flagsState: { flags }))
+      var session = HoldSession()
+      let pressed = expectation(description: "Press delivered")
+      let released = expectation(description: "Physical release delivered")
+      var transitions: [Bool] = []
+      bridge.onHold = { down, shiftHeld in
+        transitions.append(down)
+        if down {
+          session.press(at: 0)
+          pressed.fulfill()
+        } else {
+          session.release(at: 3.25, shiftHeld: shiftHeld)
+          released.fulfill()
+        }
+      }
+      _ = bridge.handle(.flagsChanged, event(key: 61, flags: flags))
+      // Exercise the public polling entry point, including its OS-state adapter.
+      bridge.reconcileHoldState()
+      await fulfillment(of: [pressed], timeout: 1)
+      XCTAssertEqual(session.tick(at: 0.2), [.start])
+      for tick in 1...120 {
+        // Recorded trace: posted Command presses/releases erase Option flags,
+        // while the physical key remains held throughout the three seconds.
+        flags = CGEventFlags(rawValue: tick % 2 == 0 ? 0x20000000 : 0x20100010)
+        bridge.reconcileHoldState()
+        XCTAssertTrue(bridge.isRightOptionHeld)
+        XCTAssertEqual(session.tick(at: 0.2 + Double(tick) * 0.025), [])
+      }
+      XCTAssertEqual(transitions, [true])
+      XCTAssertEqual(session.phase, .recording(0.2))
+      // Recover a missing native release and preserve Shift's Enter override.
+      keys.removeAll()
+      flags = .maskShift
+      bridge.reconcileHoldState()
+      await fulfillment(of: [released], timeout: 1)
+      XCTAssertEqual(transitions, [true, false])
+      XCTAssertFalse(bridge.isRightOptionHeld)
+      XCTAssertEqual(session.tick(at: 3.25), [.stop])
+      XCTAssertEqual(session.tick(at: 4.25), [.enter])
+      bridge.stop()
+    }
+  }
+
+  @MainActor
   func testLostReleaseStopsSessionOnceAndPreservesShiftChoice() async {
     let bridge = KeyboardBridge()
     var session = HoldSession()

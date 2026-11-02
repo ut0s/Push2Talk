@@ -3,8 +3,23 @@ import ApplicationServices
 import Carbon
 import Push2TalkCore
 
+struct KeyboardStateSource {
+  var keyState: (CGKeyCode) -> Bool
+  var flagsState: () -> CGEventFlags
+
+  static var system: Self {
+    Self(
+      keyState: { CGEventSource.keyState(.hidSystemState, key: $0) },
+      flagsState: { CGEventSource.flagsState(.hidSystemState) })
+  }
+}
+
 public final class KeyboardBridge {
-  public init() {}
+  private let stateSource: KeyboardStateSource
+
+  public convenience init() { self.init(stateSource: .system) }
+
+  init(stateSource: KeyboardStateSource) { self.stateSource = stateSource }
   static let marker: Int64 = 0x5032_5441_4C4B
   public var onHold: ((_ down: Bool, _ shiftHeld: Bool) -> Void)?
   public var onCancel: ((Bool) -> Void)?
@@ -34,9 +49,9 @@ public final class KeyboardBridge {
   public func reconcileHoldState() {
     guard isRightOptionHeld else { return }
     reconcileHoldState(
-      rightOptionDown: CGEventSource.keyState(.hidSystemState, key: 61),
-      leftOptionDown: CGEventSource.keyState(.hidSystemState, key: 58),
-      shiftHeld: CGEventSource.flagsState(.hidSystemState).contains(.maskShift))
+      rightOptionDown: stateSource.keyState(61),
+      leftOptionDown: stateSource.keyState(58),
+      shiftHeld: stateSource.flagsState().contains(.maskShift))
   }
 
   func reconcileHoldState(rightOptionDown: Bool, leftOptionDown: Bool = false, shiftHeld: Bool) {
