@@ -19,6 +19,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   private var pauseItem: NSMenuItem!
   private var paused = false
   private var isRestarting = false
+  private var permissionRestart = PermissionRestart()
+  private var restartNotice: NSPanel?
   private let updates = AppUpdates()
   private var settingsControls: [String: NSControl] = [:]
   private var settingsWindow: NSWindow?
@@ -167,6 +169,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   }
 
   func applicationWillTerminate(_ notification: Notification) {
+    restartNotice?.orderOut(nil)
     cancel()
     statusPopup.update(nil)
     keyboard.stop()
@@ -302,6 +305,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       listeningGranted: listeningGranted, postingGranted: postingGranted,
       monitoringRunning: keyboard.isRunning, paused: paused, setupComplete: settings.setupComplete,
       secureInputEnabled: keyboard.secureInputEnabled, optionEventStatus: keyboard.optionEventStatus)
+    checkAutomaticPermissionRestart(accessibility: accessibilityGranted, posting: postingGranted,
+      listening: listeningGranted)
+  }
+
+  private func checkAutomaticPermissionRestart(accessibility: Bool, posting: Bool, listening: Bool) {
+    guard !isRestarting else { return }
+    let quiet = [CGEventType.keyDown, .keyUp, .flagsChanged].allSatisfy {
+      CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: $0) >= 2
+    }
+    let idle = session.phase == .idle && !keyboard.isRightOptionHeld
+      && !keyboard.secureInputEnabled && quiet
+    switch permissionRestart.update(.init(accessibility: accessibility, posting: posting,
+      listening: listening), idle: idle, at: now) {
+    case .none:
+      restartNotice?.orderOut(nil)
+    case .notice:
+      if restartNotice == nil {
+        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 420, height: 76),
+          styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.isReleasedWhenClosed = false
+        panel.level = .floating
+        panel.ignoresMouseEvents = true
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        let label = NSTextField(wrappingLabelWithString:
+          L10n.text("権限を反映するためPush2Talkを再起動します。設定画面に戻ります。"))
+        label.frame = NSRect(x: 20, y: 16, width: 380, height: 44)
+        panel.contentView?.addSubview(label)
+        restartNotice = panel
+      }
+      if let panel = restartNotice, !panel.isVisible {
+        panel.center()
+        panel.orderFrontRegardless()
+      }
+    case .restart:
+      recheckPermissions()
+    }
   }
 
   private func updateStatus() {
@@ -583,6 +622,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   @objc private func recheckPermissions() {
     guard !isRestarting else { return }
     isRestarting = true
+    restartNotice?.orderOut(nil)
     cancel()
     keyboard.stop()
     // Use a new process identity so MenuBarAgent does not retain an invalid scene after exec.
@@ -591,9 +631,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     relaunch.executableURL = URL(fileURLWithPath: "/bin/sh")
     relaunch.arguments = [
       "-c",
-      "while kill -0 \"$1\" 2>/dev/null; do sleep 0.1; done; /usr/bin/open -n \"$2\" --args --settings",
+      "while kill -0 \"$1\" 2>/dev/null; do sleep 0.1; done; app=\"$2\"; shift 2; /usr/bin/open -n \"$app\" --args --settings \"$@\"",
       "Push2Talk-relaunch", String(ProcessInfo.processInfo.processIdentifier), Bundle.main.bundlePath,
-    ]
+    ] + (paused ? ["--paused"] : [])
     do {
       try relaunch.run()
       NSApp.terminate(nil)

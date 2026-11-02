@@ -51,6 +51,12 @@ final class PermissionStatusView: NSStackView {
     note.textColor = .secondaryLabelColor
     addArrangedSubview(note)
     note.widthAnchor.constraint(equalTo: widthAnchor).isActive = true
+    let restartNote = NSTextField(wrappingLabelWithString:
+      L10n.text("必要な権限の付与を検知すると、入力が落ち着いてから自動で再起動します。反映されない場合は「権限を再確認」で再起動してください。"))
+    restartNote.font = .systemFont(ofSize: 11)
+    restartNote.textColor = .secondaryLabelColor
+    addArrangedSubview(restartNote)
+    restartNote.widthAnchor.constraint(equalTo: widthAnchor).isActive = true
     let location = NSTextField(wrappingLabelWithString: L10n.format("現在のアプリ: %@", Bundle.main.bundleURL.path))
     location.font = .systemFont(ofSize: 11)
     location.isSelectable = true
