@@ -13,6 +13,25 @@ Push2TalkはmacOSアプリなのでFormulaではなくCaskを使います。
 | バージョンの管理元 | `packaging/Info.plist`の`CFBundleShortVersionString` |
 | 対応OS | macOS 13以降 |
 
+## 一つのコマンドでリリース
+
+```sh
+mise run release
+```
+
+AltTabAltと同じ構成で、`scripts/release-homebrew.sh`が公開処理をまとめて実行します。
+`./scripts/release-homebrew.sh`でも直接実行できます（作業ディレクトリに依存しません）。
+Miseが既定の`/opt/homebrew/bin/mise`以外にある場合は`MISE_BIN`で指定します。
+
+1. バージョン・作業ツリー・GitHub認証・公開先の可視性を確認
+2. SwiftテストとUniversalビルド、署名検証（設定時は公証も実施）
+3. ZIP、SHA-256、Cask、公開READMEを生成
+4. 専用の公開リポジトリにGitHub ReleaseとZIPを公開
+5. CaskとREADMEをコミット・pushし、インストールコマンドを表示
+
+バージョンの更新・作業用リポジトリのコミットは事前に行います。
+初回の公開リポジトリ作成には`P2T_CREATE_PUBLIC_REPO=1`を指定します。
+
 ## 準備
 
 XcodeまたはCommand Line Tools、Swift、Git、Ruby、GitHub CLI、Miseが必要です。
@@ -42,7 +61,7 @@ Ruby構文確認を実行します。既存ZIPからCaskとREADMEだけを再生
 P2T_CREATE_PUBLIC_REPO=1 mise run release
 ```
 
-Miseタスクは公開リポジトリの可視性を確認し、一時ディレクトリにcloneします。
+公開スクリプトはビルド前に公開リポジトリの可視性を確認し、ビルド後に一時ディレクトリにcloneします。
 空の配布リポジトリにはREADMEだけの初期コミットを作り、公開ブランチを用意します。
 その後、GitHub ReleaseにZIPをアップロードし、実際のZIPのSHA-256を含むCaskとREADMEを
 コミット・pushします。ソースコードとそのGit履歴を配布リポジトリにコピーしません。
@@ -81,7 +100,7 @@ P2T_NOTARY_PROFILE='push2talk-notary' \
 mise run prepare-release
 ```
 
-公開時も同じ環境変数を指定します。Miseタスクは署名、公証、staple、ZIP再作成を行います。
+公開時も同じ環境変数を指定します。公開スクリプトから呼ぶビルドタスクが署名、公証、staple、ZIP再作成を行います。
 署名方式を変更した配布物には新しいバージョンを使用してください。
 更新後にアクセシビリティ権限が反映されない場合は再登録とアプリ再起動を行います。
 

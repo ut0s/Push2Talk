@@ -50,7 +50,7 @@ mise run build-install
 
 `mise run build-install`でビルド後にインストール・起動します。起動せずに更新する場合は`mise run build-install --no-launch`を使います。個別に実行する場合は`mise run bundle`、`mise run install-local`を使えます。
 
-タスク一覧は`mise tasks`で確認できます。ビルド・インストール・配布の処理は`mise.toml`で管理します。
+タスク一覧は`mise tasks`で確認できます。ビルド・インストールは`mise.toml`、Homebrew公開は`scripts/release-homebrew.sh`で管理し、Miseから呼び出します。
 
 アプリアイコンの元画像は`packaging/AppIcon.png`です。`mise run bundle`で各サイズを生成して`AppIcon.icns`に変換し、アプリに組み込みます。
 
@@ -123,6 +123,8 @@ mise run prepare-release
 `dist/Push2Talk-0.1.0.zip`、SHA-256ファイル、
 `dist/homebrew-push2talk/`に公開用READMEとCaskが生成されます。
 バージョンは`packaging/Info.plist`を参照します。
+
+`mise run release`の一つのコマンドで、テスト → Universalビルド・署名 → ZIP・SHA-256・Cask生成 → GitHub Release公開 → 公開tapへのコミット・pushまで実行します。AltTabAltと同じく`scripts/release-homebrew.sh`にまとめてあり、`./scripts/release-homebrew.sh`でも直接実行できます。
 
 初回公開は、変更をコミットしてから実行します。
 
