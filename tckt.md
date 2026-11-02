@@ -730,8 +730,10 @@ $ [[ "${P2T_VERSION+x}" != x ]] || { echo 'P2T_VERSION is no longer supported. U
 ### Comments
 - 配布用README・miseタスク・plist・Cask生成・更新確認実装とApple公式資料を確認。Universal ZIP/署名公証フロー/更新案内/アイコンは準備済み。残る優先事項は配布ZIPの別環境実機検証、署名公証方式の決定、利用条件・プライバシー説明・問い合わせ先、公開前のコミットと公開後の導入更新削除確認。今回は調査回答のみで実装・公開・実機試験は未実施。
 
-## [IN_REVIEW] .github/workflows は使用しません。
+## [DONE] .github/workflows は使用しません。
 - ID: T-3d9b4bfad8b2438aa3381365a4e8a38b
+- Archived: true
+- CodexArchivedSession: 0d1bbda9e2da069651d5883ad64e3ad6a78ae321c2760c9bae0b8952ba3c8a77
 - CodexPrompt: 32b89302d6eaa22ad1e7538fb8db672d16185f5ba10d623c35440250cc180da7
 - CodexSession: 0d1bbda9e2da069651d5883ad64e3ad6a78ae321c2760c9bae0b8952ba3c8a77
 - Created: 2026-11-02
@@ -758,4 +760,21 @@ $ [[ "${P2T_VERSION+x}" != x ]] || { echo 'P2T_VERSION is no longer supported. U
 ### Comments
 - .github/workflows/check.yml を削除し、空のディレクトリも削除。リポジトリ内にワークフローへの参照がないことと git diff --check 成功を確認。他プロジェクトでも .github/workflows を使用しない基本ルールを永続メモリに保存。
 - [Question] 削除の影響を確認。ワークフローはpush/PR時のテスト・Universalビルド・Cask生成とartifact保存のみで、実行時依存なし。配布用miseタスクと更新確認は独立。削除後のSwiftビルドと全テスト成功（sandbox制約のため--disable-sandbox、一時ビルド先使用）、git diff --check成功。README.md:162にCI説明が残ることを確認（調査のみで未変更）。GitHub main保護設定はAPIがBranch not foundのため確認できず。実機音声入力・Universal配布処理全体は未再実行。
+
+## [IN_REVIEW] Homebrew 向けのリリースを一つのコマンドでできるようにまとめてほしい
+- ID: T-e05481383d1a437384c5f3484a3180c7
+- CodexPrompt: 345dd50d08f7dd7b4a492f9af1eeb8a60eba47c54bce5e29bc62a4b39bf6eed2
+- CodexSession: 8e577441328840b04c19d9bfd8673323de943f582343dc9357abf88e7b82cd70
+- Created: 2026-11-02
+- Source: Codex
+- Type: Task
+
+```text
+Homebrew 向けのリリースを一つのコマンドでできるようにまとめてほしい
+AltTabAltを参考にして
+
+```
+
+### Comments
+- AltTabAltを参考に公開処理をscripts/release-homebrew.shへ集約しmise run release/直接実行に対応、公開先確認をビルド前へ移動、READMEと配布手順を更新。Swift 38件・Universalビルド・署名・ZIP SHA-256・Cask構文成功。公開モック6シナリオ成功。GitHub実公開・公証・実機動作は未実施。
 
