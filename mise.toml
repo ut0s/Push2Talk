@@ -197,7 +197,7 @@ cask "push2talk" do
     strategy :github_latest
   end
 
-  depends_on macos: ">= :ventura"
+  depends_on macos: :ventura
   app "Push2Talk.app"
 
   zap trash: "~/Library/Preferences/com.ut0s.Push2Talk.plist"
