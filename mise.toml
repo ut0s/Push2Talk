@@ -31,14 +31,392 @@ tmux split-window -d -v -l 50% -t "$ORIGINAL_PANE_ID" -c "$PROJECT_DIR"
 description = "Run Swift tests"
 run = "swift test --scratch-path .build --cache-path .build/cache"
 
+[tasks."bump:patch"]
+description = "Increment the patch version in packaging/Info.plist"
+dir = "{{ config_root }}"
+run = '''
+#!/bin/bash
+set -euo pipefail
+exec /bin/bash scripts/bump-version.sh patch "$@"
+'''
+
+[tasks."bump:minor"]
+description = "Increment the minor version in packaging/Info.plist"
+dir = "{{ config_root }}"
+run = '''
+#!/bin/bash
+set -euo pipefail
+exec /bin/bash scripts/bump-version.sh minor "$@"
+'''
+
+[tasks."bump:major"]
+description = "Increment the major version in packaging/Info.plist"
+dir = "{{ config_root }}"
+run = '''
+#!/bin/bash
+set -euo pipefail
+exec /bin/bash scripts/bump-version.sh major "$@"
+'''
+
 [tasks.bundle]
 description = "Build the local app bundle"
-run = "bash scripts/build-app.sh"
+dir = "{{ config_root }}"
+run = '''
+#!/bin/bash
+set -euo pipefail
+
+[[ "${P2T_VERSION+x}" != x ]] || { echo 'P2T_VERSION is no longer supported. Use mise run bump:patch to update packaging/Info.plist.' >&2; exit 1; }
+version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' packaging/Info.plist)"
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'CFBundleShortVersionString must be x.y.z' >&2; exit 1; }
+app="$PWD/dist/Push2Talk.app"
+rm -rf "$app"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+cp packaging/Info.plist "$app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" "$app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $version" "$app/Contents/Info.plist"
+
+if [[ "${P2T_UNIVERSAL:-0}" == 1 ]]; then
+  swift build -c release --arch arm64 --arch x86_64 --scratch-path .build --cache-path .build/cache
+  binary_dir="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path --scratch-path .build --cache-path .build/cache)"
+else
+  swift build -c release --scratch-path .build --cache-path .build/cache
+  binary_dir="$(swift build -c release --show-bin-path --scratch-path .build --cache-path .build/cache)"
+fi
+cp "$binary_dir/Push2Talk" "$app/Contents/MacOS/Push2Talk"
+
+identity="${P2T_SIGN_IDENTITY:--}"
+if [[ "$identity" == '-' ]]; then
+  codesign --force --sign - "$app"
+else
+  codesign --force --options runtime --timestamp --sign "$identity" "$app"
+fi
+codesign --verify --strict "$app"
+archive="$PWD/dist/Push2Talk-$version.zip"
+ditto -c -k --sequesterRsrc --keepParent "$app" "$archive"
+if [[ -n "${P2T_NOTARY_PROFILE:-}" ]]; then
+  [[ "$identity" != '-' ]] || { echo 'Notarization requires a Developer ID signing identity.' >&2; exit 1; }
+  xcrun notarytool submit "$archive" --keychain-profile "$P2T_NOTARY_PROFILE" --wait
+  xcrun stapler staple "$app"
+  xcrun stapler validate "$app"
+  ditto -c -k --sequesterRsrc --keepParent "$app" "$archive"
+fi
+shasum -a 256 "$archive" > "$archive.sha256"
+echo "Built $app"
+echo "Archive: $archive"
+'''
+
+[tasks.build-install]
+description = "Build the app, install it in /Applications, and launch settings"
+depends = ["bundle"]
+dir = "{{ config_root }}"
+run = '''
+#!/bin/bash
+set -euo pipefail
+exec "{{ mise_bin }}" run install-local "$@"
+'''
+
+[tasks.install-local]
+description = "Install the built app in /Applications and launch settings"
+dir = "{{ config_root }}"
+run = '''
+#!/bin/bash
+set -euo pipefail
+
+source_app="$PWD/dist/Push2Talk.app"
+target_app="/Applications/Push2Talk.app"
+launch_app=1
+if [[ $# == 1 && "$1" == '--no-launch' ]]; then
+  launch_app=0
+elif [[ $# != 0 ]]; then
+  echo 'Usage: mise run install-local [--no-launch]' >&2
+  exit 1
+fi
+[[ -x "$source_app/Contents/MacOS/Push2Talk" ]] || { echo 'Build dist/Push2Talk.app first.' >&2; exit 1; }
+codesign --verify --strict "$source_app"
+if [[ -e "$target_app" ]]; then
+  identifier="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$target_app/Contents/Info.plist")"
+  [[ "$identifier" == 'com.ut0s.Push2Talk' ]] || { echo 'Destination belongs to another app.' >&2; exit 1; }
+fi
+if pgrep -x Push2Talk >/dev/null; then
+  osascript -e 'tell application id "com.ut0s.Push2Talk" to quit'
+  for ((attempt = 0; attempt < 30; attempt++)); do
+    if ! pgrep -x Push2Talk >/dev/null; then break; fi
+    sleep 0.1
+  done
+  if pgrep -x Push2Talk >/dev/null; then
+    echo 'Push2Talk is still running. Quit it before installing.' >&2
+    exit 1
+  fi
+fi
+ditto "$source_app" "$target_app"
+codesign --verify --strict "$target_app"
+if [[ "$launch_app" == 1 ]]; then
+  open "$target_app" --args --settings
+fi
+echo "Installed $target_app"
+echo 'Register this installed copy in System Settings. Rebuilding dist does not replace it.'
+'''
+
+[tasks.prepare-homebrew]
+description = "Generate the public Homebrew Cask and README from an existing archive"
+dir = "{{ config_root }}"
+run = '''
+#!/bin/bash
+set -euo pipefail
+
+if [[ $# != 2 ]]; then
+  echo 'Usage: mise run prepare-homebrew OWNER/homebrew-push2talk VERSION' >&2
+  exit 1
+fi
+distribution_repo="$1"
+version="$2"
+owner="${distribution_repo%%/*}"
+tap="${distribution_repo#*/homebrew-}"
+[[ "$distribution_repo" =~ ^[A-Za-z0-9_-]+/homebrew-[A-Za-z0-9_-]+$ ]] || { echo 'Expected OWNER/homebrew-NAME' >&2; exit 1; }
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Expected x.y.z version' >&2; exit 1; }
+archive="$PWD/dist/Push2Talk-$version.zip"
+[[ -f "$archive" ]] || { echo "Build $archive first" >&2; exit 1; }
+checksum="$(shasum -a 256 "$archive" | awk '{print $1}')"
+tap_dir="$PWD/dist/homebrew-push2talk"
+mkdir -p "$tap_dir/Casks"
+cat > "$tap_dir/Casks/push2talk.rb" <<EOF
+cask "push2talk" do
+  version "$version"
+  sha256 "$checksum"
+
+  url "https://github.com/$distribution_repo/releases/download/v#{version}/Push2Talk-#{version}.zip"
+  name "Push2Talk"
+  desc "Hold right Option to use macOS Dictation, release to finish, with optional Enter submission"
+  homepage "https://github.com/$distribution_repo"
+
+  livecheck do
+    url :url
+    strategy :github_latest
+  end
+
+  depends_on macos: ">= :ventura"
+  app "Push2Talk.app"
+
+  zap trash: "~/Library/Preferences/com.ut0s.Push2Talk.plist"
+
+  caveats do
+    <<~EOS
+      First launch:
+        open "#{appdir}/Push2Talk.app"
+
+      macOS may block apps that have not been notarized by Apple.
+      Only if you trust the source, verify the app signature first:
+        codesign --verify --deep --strict --verbose=2 "#{appdir}/Push2Talk.app"
+      Only after verification succeeds, remove quarantine and launch the app:
+        xattr -dr com.apple.quarantine "#{appdir}/Push2Talk.app"
+        open "#{appdir}/Push2Talk.app"
+      Signature verification does not establish the developer's identity.
+      If verification fails, obtain a fresh copy before proceeding.
+
+      Setup after launch:
+        1. Enable Dictation in System Settings > Keyboard > Dictation.
+        2. Set the Dictation shortcut to press right Command twice.
+           If you use another shortcut, select the matching one in Push2Talk.
+        3. Allow Push2Talk in System Settings > Privacy & Security > Accessibility.
+           If key monitoring cannot start, also check Input Monitoring.
+        4. Complete initial setup and recheck permissions in Push2Talk's settings.
+           Restart Push2Talk if permission changes are not reflected.
+
+      To dictate, focus a text field, hold right Option, and speak; release to finish.
+      Automatic Enter submission is off by default.
+      Show these instructions again: brew info --cask $owner/$tap/push2talk
+    EOS
+  end
+end
+EOF
+cat > "$tap_dir/README.md" <<EOF
+# Push2Talk
+
+macOS 13 or later. Hold right Option to start macOS Dictation; release to finish. Automatic Enter submission is optional and off by default.
+
+\`\`\`sh
+brew tap $owner/$tap
+brew install --cask push2talk
+open -a Push2Talk
+\`\`\`
+
+Enable Dictation in System Settings → Keyboard and set its shortcut to right Command twice.
+Grant Push2Talk Accessibility permission and complete setup in the menu bar.
+The app settings support other double-press Dictation shortcuts.
+
+## First launch
+
+Ad-hoc builds are not notarized by Apple and macOS may block downloaded copies.
+For a copy from a source you trust, verify its signature first:
+
+\`\`\`sh
+codesign --verify --deep --strict --verbose=2 /Applications/Push2Talk.app
+\`\`\`
+
+Only after verification succeeds, remove quarantine from this app and launch it:
+
+\`\`\`sh
+xattr -dr com.apple.quarantine /Applications/Push2Talk.app
+open -a Push2Talk
+\`\`\`
+
+If verification fails, obtain a fresh copy before proceeding.
+Developer ID signed and notarized builds do not normally need this step.
+
+## Update
+
+\`\`\`sh
+brew update
+brew upgrade --cask push2talk
+\`\`\`
+
+If Accessibility permission stops working after an update, re-register Push2Talk
+in System Settings and restart the app.
+EOF
+ruby -c "$tap_dir/Casks/push2talk.rb"
+echo "Prepared $tap_dir"
+echo "Release asset: $archive"
+echo "Install after publication: brew install --cask $owner/$tap/push2talk"
+'''
 
 [tasks.prepare-release]
 description = "Prepare Universal app and Homebrew Cask locally"
-run = "bash scripts/release-homebrew.sh --prepare"
+dir = "{{ config_root }}"
+run = '''
+#!/bin/bash
+set -euo pipefail
+exec "{{ mise_bin }}" run release --prepare "$@"
+'''
 
 [tasks.release]
 description = "Publish app and Cask to the dedicated public repository"
-run = "bash scripts/release-homebrew.sh"
+dir = "{{ config_root }}"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'HELP'
+Usage: mise run release [--prepare] [--skip-checks]
+
+Default: build, publish a GitHub release, and update the dedicated public Cask.
+--prepare: build and generate dist/homebrew-push2talk without publishing.
+--skip-checks: skip Swift tests (the app is always rebuilt).
+
+Environment:
+  P2T_PUBLIC_REPO=ut0s/homebrew-push2talk
+  P2T_PUBLIC_BRANCH=main
+  P2T_CREATE_PUBLIC_REPO=1       Create the public repository if missing.
+  P2T_SIGN_IDENTITY=...          Optional Developer ID Application identity.
+  P2T_NOTARY_PROFILE=...         Optional notarytool keychain profile.
+  GH_BIN=/opt/homebrew/bin/gh
+
+Existing release assets are reused and their downloaded SHA-256 is used.
+Use a new version to ship changes; existing assets are never overwritten.
+HELP
+}
+die() { echo "Error: $*" >&2; exit 1; }
+prepare=0
+skip_checks=0
+for arg in "$@"; do
+  case "$arg" in
+    --prepare) prepare=1 ;;
+    --skip-checks) skip_checks=1 ;;
+    --help|-h) usage; exit 0 ;;
+    *) die "Unknown argument: $arg" ;;
+  esac
+done
+
+public_repo="${P2T_PUBLIC_REPO:-ut0s/homebrew-push2talk}"
+public_branch="${P2T_PUBLIC_BRANCH:-main}"
+[[ "${P2T_VERSION+x}" != x ]] || { echo 'P2T_VERSION is no longer supported. Use mise run bump:patch to update packaging/Info.plist.' >&2; exit 1; }
+version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' packaging/Info.plist)"
+[[ "$public_repo" =~ ^[A-Za-z0-9_-]+/homebrew-[A-Za-z0-9_-]+$ ]] || die 'Expected OWNER/homebrew-NAME.'
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die 'Expected x.y.z version.'
+git check-ref-format --branch "$public_branch" >/dev/null
+GH_BIN="${GH_BIN:-/opt/homebrew/bin/gh}"
+
+if [[ "$prepare" == 0 ]]; then
+  [[ -z "$(git status --porcelain)" ]] || die 'Commit or stash changes before publishing; use --prepare for a local preview.'
+  git rev-parse --verify HEAD >/dev/null
+  command -v "$GH_BIN" >/dev/null || die 'GitHub CLI is required.'
+  "$GH_BIN" auth status >/dev/null 2>&1 || die 'Log in with gh auth login first.'
+fi
+if [[ "$skip_checks" == 0 ]]; then
+  "{{ mise_bin }}" run test
+fi
+P2T_UNIVERSAL=1 "{{ mise_bin }}" run bundle
+"{{ mise_bin }}" run prepare-homebrew "$public_repo" "$version"
+if [[ "$prepare" == 1 ]]; then
+  echo 'Prepared locally. No GitHub repository or release was changed.'
+  exit 0
+fi
+
+visibility="$("$GH_BIN" repo view "$public_repo" --json visibility -q '.visibility' 2>/dev/null || true)"
+if [[ -z "$visibility" ]]; then
+  [[ "${P2T_CREATE_PUBLIC_REPO:-0}" == 1 ]] || die 'Public repository unavailable. Create it or set P2T_CREATE_PUBLIC_REPO=1.'
+  "$GH_BIN" repo create "$public_repo" --public --description 'Homebrew distribution for Push2Talk'
+elif [[ "$visibility" != PUBLIC ]]; then
+  die 'The dedicated distribution repository must be public.'
+fi
+
+work_dir="$(mktemp -d)"
+trap 'rm -rf "$work_dir"' EXIT
+public_dir="$work_dir/tap"
+# Use an isolated checkout; never copy source code or its Git history.
+"$GH_BIN" repo clone "$public_repo" "$public_dir"
+if git -C "$public_dir" show-ref --verify --quiet "refs/remotes/origin/$public_branch"; then
+  git -C "$public_dir" checkout -B "$public_branch" "origin/$public_branch"
+else
+  git -C "$public_dir" checkout -B "$public_branch"
+fi
+if ! git -C "$public_dir" config user.name >/dev/null || ! git -C "$public_dir" config user.email >/dev/null; then
+  login="$("$GH_BIN" api user -q '.login')"
+  user_id="$("$GH_BIN" api user -q '.id')"
+  git -C "$public_dir" config user.name "$login"
+  git -C "$public_dir" config user.email "$user_id+$login@users.noreply.github.com"
+fi
+if ! git -C "$public_dir" rev-parse --verify HEAD >/dev/null 2>&1; then
+  cp dist/homebrew-push2talk/README.md "$public_dir/README.md"
+  git -C "$public_dir" add README.md
+  git -C "$public_dir" commit -m 'chore: initialize Push2Talk Homebrew distribution'
+  git -C "$public_dir" push -u origin "$public_branch"
+fi
+
+tag="v$version"
+asset_name="Push2Talk-$version.zip"
+archive="$PWD/dist/$asset_name"
+# An existing asset is authoritative: rebuilding a ZIP changes its checksum.
+if "$GH_BIN" release view "$tag" --repo "$public_repo" >/dev/null 2>&1; then
+  mkdir -p "$work_dir/download"
+  assets="$("$GH_BIN" release view "$tag" --repo "$public_repo" --json assets -q '.assets[].name')"
+  if printf '%s\n' "$assets" | /usr/bin/grep -Fxq "$asset_name"; then
+    "$GH_BIN" release download "$tag" --repo "$public_repo" --pattern "$asset_name" --dir "$work_dir/download"
+    cp "$work_dir/download/$asset_name" "$archive"
+  else
+    "$GH_BIN" release upload "$tag" "$archive" --repo "$public_repo"
+  fi
+else
+  cat > "$work_dir/notes.md" <<NOTES
+Hold right Option to use macOS Dictation; release to finish. Automatic Enter submission is optional and off by default.
+Universal macOS app (Apple Silicon / Intel), macOS 13 or later.
+See the distribution README for Dictation setup, Accessibility permissions, and first launch instructions.
+NOTES
+  "$GH_BIN" release create "$tag" "$archive" --repo "$public_repo" --target "$public_branch" \
+    --title "Push2Talk $version" --notes-file "$work_dir/notes.md"
+fi
+shasum -a 256 "$archive" > "$archive.sha256"
+"{{ mise_bin }}" run prepare-homebrew "$public_repo" "$version"
+mkdir -p "$public_dir/Casks"
+cp dist/homebrew-push2talk/Casks/push2talk.rb "$public_dir/Casks/push2talk.rb"
+cp dist/homebrew-push2talk/README.md "$public_dir/README.md"
+git -C "$public_dir" add Casks/push2talk.rb README.md
+if ! git -C "$public_dir" diff --cached --quiet; then
+  git -C "$public_dir" commit -m "chore(release): publish Push2Talk $version"
+  git -C "$public_dir" push origin "$public_branch"
+fi
+owner="${public_repo%%/*}"
+tap="${public_repo#*/homebrew-}"
+echo "Published https://github.com/$public_repo/releases/tag/$tag"
+echo "Install: brew install --cask $owner/$tap/push2talk"
+'''
