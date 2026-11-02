@@ -102,12 +102,12 @@ mise run build-install
 `P2T_VERSION`による上書き機能は削除しており、環境変数が設定されていても使用しません。
 
 ```sh
-mise run bump:patch  # Increment patch: 0.1.0 -> 0.1.1
-mise run bump:minor  # Increment minor: 0.1.1 -> 0.2.0
-mise run bump:major  # Increment major: 0.2.0 -> 1.0.0
+mise run bump:patch:commit  # Increment patch: 0.1.0 -> 0.1.1
+mise run bump:minor:commit  # Increment minor: 0.1.1 -> 0.2.0
+mise run bump:major:commit  # Increment major: 0.2.0 -> 1.0.0
 ```
 
-`bump:patch`・`bump:minor`・`bump:major`は指定した桁を1つ上げ、下位の桁を0に戻し、plistの`CFBundleShortVersionString`と`CFBundleVersion`を同じ値に更新します。更新する桁はコロン区切りのタスク名で指定します。更新したplistだけを`chore(release): bump version to X.Y.Z`で自動コミットします。
+`bump:patch:commit`・`bump:minor:commit`・`bump:major:commit`は指定した桁を1つ上げ、下位の桁を0に戻し、plistの`CFBundleShortVersionString`と`CFBundleVersion`を同じ値に更新します。更新する桁はコロン区切りのタスク名で指定します。更新したplistだけを`chore(release): bump version to X.Y.Z`で自動コミットします。
 実行前に未コミットの変更（ステージ済み・未ステージ・未追跡ファイルを含む）がある場合は、エラーメッセージを表示して停止し、バージョン更新もコミットも行いません。先に変更をコミットするかstashしてください。コミットに失敗した場合はエラー終了し、更新したplistは確認・修正できるよう残ります。
 更新後は`mise run release`を実行してください。ビルド・配布処理は常にplistからバージョンを読み取ります。
 
@@ -175,5 +175,19 @@ Enter送信の確認には、アクセシビリティ経由で元の入力欄の
 - 入力中にEscape、別アプリへの切替、別入力欄のクリックを行うとEnterを送らないこと。
 - 左Optionが通常どおり使え、一時停止中は右Optionも通常どおり使えること。
 - 初期設定では文字だけが残り、Enterによる送信・決定・改行が行われないこと。通常オフでは左右どちらかのShiftを押したまま右Optionを離すとEnterが送られ、通常オンでは同じ操作でEnterが抑止されること。Shiftを押したまま開始でき、途中で押したり離したりしても中断されないこと。
+
+### 入力処理を変更したときの回帰確認
+
+2026-11-02には、音声入力開始用の修飾キー送信がOSの修飾フラグを書き換え、右Optionを押し続けていても解放と判定する不具合が発生しました。実機では、論理的な右Optionが物理キー状態では左Option側に対応していました。現在は押下ごとに対応する物理キーを確認し、特定できない場合は修飾フラグだけで解放と断定しません。ウィンドウの破棄処理とは別の、解放通知の補完処理にあった問題です。
+
+入力系の修正は、次を確認してから動作確認済みと扱います。
+
+- 自動テストでは、公開のポーリング入口からOS状態の読み取りと長押しセッションを通す。物理キーを保持したまま、開始ショートカットでOptionフラグが消える記録を再現する。内部判定への真偽値入力だけで検証を終えない。
+- 自動テストでは、左右の対応変更・左右同時押し・対応不明・解放通知欠落・ShiftによるEnter反転を維持する。
+- 実機では、通常の入力欄で3秒以上押し続け、音声入力と録音中アイコンが途中で終了せず、離すと終了することを確認する。設定画面でキー受信が見えるだけでは合格にしない。
+- 設定画面の開閉後にも同じ操作を確認する。キーの入れ替えを使う環境では、その設定を有効にした状態でも確認する。
+- インストールした実行ファイルが検証対象と一致することを確認し、更新後の権限とキー監視を確認する。許可が引き継がれなかった場合は再登録・再起動後に実機確認を行う。
+
+`mise run test`が成功しても、実音声入力や権限の実機確認を自動的に完了したことにはしません。検証結果には、自動テスト・ビルド・インストール・実機確認をそれぞれ記録します。
 
 参照: [Appleの音声入力ガイド](https://support.apple.com/en-gb/guide/mac-help/mh40584/mac)、[Homebrew Cask Cookbook](https://docs.brew.sh/Cask-Cookbook)。
