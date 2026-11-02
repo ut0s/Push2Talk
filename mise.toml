@@ -32,7 +32,7 @@ description = "Run Swift tests"
 run = "swift test --scratch-path .build --cache-path .build/cache"
 
 [tasks."bump:patch"]
-description = "Increment the patch version in packaging/Info.plist"
+description = "Increment the patch version and commit it (requires a clean working tree)"
 dir = "{{ config_root }}"
 run = '''
 #!/bin/bash
@@ -41,7 +41,7 @@ exec /bin/bash scripts/bump-version.sh patch "$@"
 '''
 
 [tasks."bump:minor"]
-description = "Increment the minor version in packaging/Info.plist"
+description = "Increment the minor version and commit it (requires a clean working tree)"
 dir = "{{ config_root }}"
 run = '''
 #!/bin/bash
@@ -50,7 +50,7 @@ exec /bin/bash scripts/bump-version.sh minor "$@"
 '''
 
 [tasks."bump:major"]
-description = "Increment the major version in packaging/Info.plist"
+description = "Increment the major version and commit it (requires a clean working tree)"
 dir = "{{ config_root }}"
 run = '''
 #!/bin/bash

@@ -10,7 +10,16 @@ case "$part" in
   patch|minor|major) ;;
   *) echo 'Expected patch, minor, or major.' >&2; exit 1 ;;
 esac
+
+cd "$(dirname "$0")/.."
 plist='packaging/Info.plist'
+git ls-files --error-unmatch "$plist" >/dev/null
+status="$(git status --porcelain --untracked-files=all)"
+if [[ -n "$status" ]]; then
+  echo 'Error: Uncommitted changes exist. Commit or stash all changes before bumping the version.' >&2
+  exit 1
+fi
+
 current="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist")"
 # Ruby integers avoid overflow when incrementing version components.
 next="$(/usr/bin/ruby -e '
@@ -24,4 +33,5 @@ next="$(/usr/bin/ruby -e '
 ' "$current" "$part")"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $next" "$plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $next" "$plist"
+git commit --only -m "chore(release): bump version to $next" -- "$plist"
 echo "Version: $current -> $next"
