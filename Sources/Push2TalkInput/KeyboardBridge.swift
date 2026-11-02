@@ -30,9 +30,13 @@ public final class KeyboardBridge {
 
   public func reconcileHoldState() {
     guard isRightOptionHeld else { return }
+    let flags = CGEventSource.flagsState(.hidSystemState)
+    let altHeld = flags.contains(.maskAlternate)
+    let key61Down = CGEventSource.keyState(.hidSystemState, key: 61)
+    let rightOptionDown = altHeld && (key61Down || (flags.rawValue & 0x40 != 0) || (flags.rawValue & 0x60 == 0))
     reconcileHoldState(
-      rightOptionDown: CGEventSource.keyState(.hidSystemState, key: 61),
-      shiftHeld: CGEventSource.flagsState(.hidSystemState).contains(.maskShift))
+      rightOptionDown: rightOptionDown,
+      shiftHeld: flags.contains(.maskShift))
   }
 
   func reconcileHoldState(rightOptionDown: Bool, shiftHeld: Bool) {
@@ -141,6 +145,7 @@ public final class KeyboardBridge {
     }
     if type == .flagsChanged && code == 61 {
       if let down = stateLock.withLock({ optionState.update(keyCode: code, flags: event.flags.rawValue) }) {
+        NSLog("Push2Talk: right Option event down=%@ flags=0x%llx", String(down), event.flags.rawValue)
         let shiftHeld = event.flags.contains(.maskShift)
         deliver { $0.onHold?(down, shiftHeld) }
       }

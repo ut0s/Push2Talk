@@ -60,6 +60,21 @@ final class KeyboardBridgeTests: XCTestCase {
   }
 
   @MainActor
+  func testReconcileHoldStateWithoutPhysicalHoldRecoversRelease() async {
+    let bridge = KeyboardBridge()
+    let released = expectation(description: "Recovered release delivered")
+    bridge.onHold = { down, _ in
+      if !down { released.fulfill() }
+    }
+    _ = bridge.handle(.flagsChanged, event(key: 61, flags: CGEventFlags(rawValue: 0x80040)))
+    XCTAssertTrue(bridge.isRightOptionHeld)
+    bridge.reconcileHoldState()
+    XCTAssertFalse(bridge.isRightOptionHeld)
+    await fulfillment(of: [released], timeout: 1)
+    bridge.stop()
+  }
+
+  @MainActor
   func testEitherShiftPassesThroughWithoutCancellingAndIsCapturedAtRelease() async {
     for shiftKey in [CGKeyCode(56), CGKeyCode(60)] {
       let bridge = KeyboardBridge()

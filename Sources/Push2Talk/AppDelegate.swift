@@ -190,6 +190,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   private var now: Double { ProcessInfo.processInfo.systemUptime }
 
   private func hold(_ down: Bool, shiftHeld: Bool) {
+    NSLog("Push2Talk: hold down=%@ phase=%@", String(down), String(describing: session.phase))
     // Update the hold indicator even when Dictation cannot start in the current context.
     updateStatus()
     defer { updateStatus() }
@@ -211,8 +212,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
     guard session.phase == .idle else { return }
     let flags = CGEventSource.flagsState(.hidSystemState)
+    let leftOptionOnly = (flags.rawValue & 0x60) == 0x20
     guard flags.intersection([.maskControl, .maskCommand, .maskSecondaryFn]).isEmpty,
-      flags.rawValue & 0x20 == 0
+      !leftOptionOnly
     else { reportOperation(L10n.text("開始しません: ほかの修飾キーを離してから右Optionを押してください")); return }
     guard let focus = FocusTarget.capture() else {
       reportOperation(L10n.text("開始しません: 別アプリの入力欄を選んでください（パスワード欄は対象外です）")); return
@@ -261,6 +263,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   }
 
   private func reportOperation(_ message: String) {
+    NSLog("Push2Talk: %@", message)
     // Diagnostic output contains control status only, never text or audio.
     if CommandLine.arguments.contains("--diagnostics"), let data = ("Push2Talk: \(message)\n").data(using: .utf8) {
       FileHandle.standardError.write(data)
