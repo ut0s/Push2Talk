@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# != 1 ]]; then
-  echo 'Use mise run bump:patch, bump:minor, or bump:major without arguments.' >&2
+  echo 'Use mise run bump:patch:commit, bump:minor:commit, or bump:major:commit without arguments.' >&2
   exit 1
 fi
 part="$1"

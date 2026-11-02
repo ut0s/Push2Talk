@@ -31,7 +31,7 @@ tmux split-window -d -v -l 50% -t "$ORIGINAL_PANE_ID" -c "$PROJECT_DIR"
 description = "Run Swift tests"
 run = "swift test --scratch-path .build --cache-path .build/cache"
 
-[tasks."bump:patch"]
+[tasks."bump:patch:commit"]
 description = "Increment the patch version and commit it (requires a clean working tree)"
 dir = "{{ config_root }}"
 run = '''
@@ -40,7 +40,7 @@ set -euo pipefail
 exec /bin/bash scripts/bump-version.sh patch "$@"
 '''
 
-[tasks."bump:minor"]
+[tasks."bump:minor:commit"]
 description = "Increment the minor version and commit it (requires a clean working tree)"
 dir = "{{ config_root }}"
 run = '''
@@ -49,7 +49,7 @@ set -euo pipefail
 exec /bin/bash scripts/bump-version.sh minor "$@"
 '''
 
-[tasks."bump:major"]
+[tasks."bump:major:commit"]
 description = "Increment the major version and commit it (requires a clean working tree)"
 dir = "{{ config_root }}"
 run = '''
