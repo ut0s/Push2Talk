@@ -6,12 +6,12 @@ import Push2TalkCore
 public final class KeyboardBridge {
   public init() {}
   static let marker: Int64 = 0x5032_5441_4C4B
-  public var onHold: ((Bool) -> Void)?
+  public var onHold: ((_ down: Bool, _ shiftHeld: Bool) -> Void)?
   public var onCancel: ((Bool) -> Void)?
   private var tap: CFMachPort?
   private var runLoopSource: CFRunLoopSource?
   private var optionState = RightOptionState()
-  private var lastOptionEvent = "Optionキーの受信: 未確認（右Optionを押して確認）"
+  private var lastOptionEvent: (code: Int64, flags: UInt64)?
   private let stateLock = NSLock()
   private var eventThread: Thread?
   private var eventRunLoop: CFRunLoop?
@@ -19,7 +19,13 @@ public final class KeyboardBridge {
   private var nextPostTime = ProcessInfo.processInfo.systemUptime
 
   public var isRightOptionHeld: Bool { stateLock.withLock { optionState.isHeld } }
-  public var optionEventStatus: String { stateLock.withLock { lastOptionEvent } }
+  public var optionEventStatus: String {
+    guard let event = stateLock.withLock({ lastOptionEvent }) else {
+      return L10n.text("Optionキーの受信: 未確認（右Optionを押して確認）")
+    }
+    let side = L10n.text(event.code == 61 ? "右Option" : "左Option")
+    return L10n.format("直近の受信: %@ / flags=0x%@", side, String(event.flags, radix: 16))
+  }
   public var secureInputEnabled: Bool { IsSecureEventInputEnabled() }
 
   public var isRunning: Bool {
@@ -112,18 +118,19 @@ public final class KeyboardBridge {
     }
     let code = event.getIntegerValueField(.keyboardEventKeycode)
     if type == .flagsChanged && (code == 58 || code == 61) {
-      let side = code == 61 ? "右Option" : "左Option"
       stateLock.withLock {
-        lastOptionEvent = "直近の受信: \(side) / flags=0x\(String(event.flags.rawValue, radix: 16))"
+        lastOptionEvent = (code: code, flags: event.flags.rawValue)
       }
     }
     if type == .flagsChanged && code == 61 {
       if let down = stateLock.withLock({ optionState.update(keyCode: code, flags: event.flags.rawValue) }) {
-        deliver { $0.onHold?(down) }
+        let shiftHeld = event.flags.contains(.maskShift)
+        deliver { $0.onHold?(down, shiftHeld) }
       }
       return nil
     }
-    if type == .keyDown || type == .flagsChanged {
+    let isShiftTransition = type == .flagsChanged && (code == 56 || code == 60)
+    if type == .keyDown || (type == .flagsChanged && !isShiftTransition) {
       let nativeEscape = type == .keyDown && code == 53
       deliver { $0.onCancel?(nativeEscape) }
     }

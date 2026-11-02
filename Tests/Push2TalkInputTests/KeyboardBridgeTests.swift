@@ -1,8 +1,48 @@
 import CoreGraphics
+import Push2TalkCore
 import XCTest
 @testable import Push2TalkInput
 
 final class KeyboardBridgeTests: XCTestCase {
+  @MainActor
+  func testEitherShiftPassesThroughWithoutCancellingAndIsCapturedAtRelease() async {
+    for shiftKey in [CGKeyCode(56), CGKeyCode(60)] {
+      let bridge = KeyboardBridge()
+      let delivered = expectation(description: "Hold transitions with Shift captured")
+      delivered.expectedFulfillmentCount = 2
+      var shifts: [Bool] = []
+      var cancelled = false
+      bridge.onCancel = { _ in cancelled = true }
+      bridge.onHold = { _, shiftHeld in
+        shifts.append(shiftHeld)
+        delivered.fulfill()
+      }
+      _ = bridge.handle(.flagsChanged, event(key: 61, flags: .maskAlternate))
+      let shiftDown = event(key: shiftKey, flags: [.maskShift, .maskAlternate])
+      XCTAssertTrue(bridge.handle(.flagsChanged, shiftDown)?.takeUnretainedValue() === shiftDown)
+      XCTAssertTrue(shiftDown.flags.contains(.maskShift))
+      _ = bridge.handle(.flagsChanged, event(key: 61, flags: .maskShift))
+      // Release Shift before the main queue processes the Option release.
+      let shiftUp = event(key: shiftKey)
+      XCTAssertTrue(bridge.handle(.flagsChanged, shiftUp)?.takeUnretainedValue() === shiftUp)
+      await fulfillment(of: [delivered], timeout: 1)
+      XCTAssertEqual(shifts, [false, true])
+      XCTAssertFalse(cancelled)
+      bridge.stop()
+    }
+  }
+
+  @MainActor
+  func testOtherModifiersStillCancel() async {
+    let bridge = KeyboardBridge()
+    let delivered = expectation(description: "Command cancels")
+    bridge.onCancel = { _ in delivered.fulfill() }
+    let command = event(key: 55, flags: .maskCommand)
+    XCTAssertTrue(bridge.handle(.flagsChanged, command)?.takeUnretainedValue() === command)
+    await fulfillment(of: [delivered], timeout: 1)
+    bridge.stop()
+  }
+
   private func event(key: CGKeyCode, flags: CGEventFlags = []) -> CGEvent {
     let event = CGEvent(keyboardEventSource: nil, virtualKey: key, keyDown: true)!
     event.flags = flags
@@ -35,7 +75,7 @@ final class KeyboardBridgeTests: XCTestCase {
     let delivered = expectation(description: "Press and release delivered")
     delivered.expectedFulfillmentCount = 2
     var transitions: [Bool] = []
-    bridge.onHold = { down in
+    bridge.onHold = { down, _ in
       XCTAssertTrue(Thread.isMainThread)
       transitions.append(down)
       delivered.fulfill()
@@ -55,7 +95,7 @@ final class KeyboardBridgeTests: XCTestCase {
     let input = event(key: 58, flags: CGEventFlags(rawValue: 0x80020))
     XCTAssertTrue(bridge.handle(.flagsChanged, input)?.takeUnretainedValue() === input)
     XCTAssertFalse(bridge.isRightOptionHeld)
-    XCTAssertTrue(bridge.optionEventStatus.contains("左Option"))
+    XCTAssertTrue(bridge.optionEventStatus.contains(L10n.text("左Option")))
     _ = bridge.handle(.flagsChanged, event(key: 61, flags: CGEventFlags(rawValue: 0x80040)))
     let typing = event(key: 0, flags: CGEventFlags(rawValue: 0x80040))
     XCTAssertTrue(bridge.handle(.keyDown, typing)?.takeUnretainedValue() === typing)
@@ -67,7 +107,7 @@ final class KeyboardBridgeTests: XCTestCase {
   func testStoppedBridgeDiscardsPendingHoldAndCancelCallbacks() async {
     let bridge = KeyboardBridge()
     var called = false
-    bridge.onHold = { _ in called = true }
+    bridge.onHold = { _, _ in called = true }
     bridge.onCancel = { _ in called = true }
     _ = bridge.handle(.flagsChanged, event(key: 61, flags: CGEventFlags(rawValue: 0x80040)))
     _ = bridge.handle(.keyDown, event(key: 0))
@@ -102,6 +142,6 @@ final class KeyboardBridgeTests: XCTestCase {
     input.setIntegerValueField(.eventSourceUserData, value: KeyboardBridge.marker)
     XCTAssertTrue(bridge.handle(.flagsChanged, input)?.takeUnretainedValue() === input)
     XCTAssertFalse(bridge.isRightOptionHeld)
-    XCTAssertTrue(bridge.optionEventStatus.contains("未確認"))
+    XCTAssertEqual(bridge.optionEventStatus, L10n.text("Optionキーの受信: 未確認（右Optionを押して確認）"))
   }
 }

@@ -1,14 +1,15 @@
+import Push2TalkCore
 import CoreGraphics
 
 public enum DictationTrigger: String, CaseIterable {
   case rightCommand, control, option, command, fn
   public var title: String {
     switch self {
-    case .rightCommand: return "右Commandを2回"
-    case .control: return "Controlを2回"
-    case .option: return "左Optionを2回"
-    case .command: return "左Commandを2回"
-    case .fn: return "Fn / 地球儀を2回（実験的）"
+    case .rightCommand: return L10n.text("右Commandを2回")
+    case .control: return L10n.text("Controlを2回")
+    case .option: return L10n.text("左Optionを2回")
+    case .command: return L10n.text("左Commandを2回")
+    case .fn: return L10n.text("Fn / 地球儀を2回（実験的）")
     }
   }
   public var keyCode: CGKeyCode {
