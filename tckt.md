@@ -50,6 +50,7 @@
 
 ## [DONE] うまく動いていない。
 - ID: T-5c76ada8e8844e8b99280c4fcf45ebb5
+- Archived: true
 - CodexPrompt: 8f623925c61e6c53ae878d9df5a8922045780aa44e1594d4b1eb69f8a3c94cd8
 - CodexSession: e5a01554a58aa292759acb4054f810ebcfbfeb0390e4c2c6a4b45650debb6e32
 - Created: 2026-11-01
@@ -183,6 +184,7 @@ Push2Talkを起動しているとキーボードが全く入力できなくな�
 
 ## [DONE] 右オプションのキーを話すと同時にエンターが押されている気がする。チャットや他のUIでも決定が進んでしまうので確認してほしいし、本当の場合は最後のエンター送信を止めて欲しい。
 - ID: T-c65a4f1c65f64f8486371a3b822175e6
+- Archived: true
 - CodexPrompt: 3c21b99875b282362d579e9e46de7a6d4857361e46549887294232b1e8e2ed33
 - CodexSession: ce140bc2d042fd56dee9b58a6115205d84e8b34f73f8b3d2dca8003cbd4e79fb
 - Created: 2026-11-02
@@ -207,6 +209,7 @@ Push2Talkを起動しているとキーボードが全く入力できなくな�
 
 ## [DONE] 録音中は入力中やrecなどを複数のテキストを選択可能にしてほしい。またテキストなしも選択肢に含めて欲しい。
 - ID: T-5a6403760c8c4a508e5ac76a3a14f38c
+- Archived: true
 - CodexPrompt: 9221460dccffdaabd61b05752ccde8686d303ec39a301786e734cf58d15a275c
 - CodexSession: 5517af8f05892481d18418c8e998357047e1751eaa4abcf439129101781534c1
 - Created: 2026-11-02
@@ -232,6 +235,7 @@ RECとrecは重複しているのでRECだけでOK
 
 ## [DONE] 相談です。現状はメニューバーのアイコンに録音中や入力中を表示しているが、画面ポップアップで表示することもできますか？イメージは画面の下からポップアップが出てきて、音声波形が見えるようなイメージメー
 - ID: T-5a2c58de4c904b4a95daeb0140cb6fc0
+- Archived: true
 - CodexPrompt: bcb9e33430c5a54c6b368922b61c6a7a5bfcf2c43eba9c24b25abc6b641c9795
 - CodexSession: 85927cb84c9195b28788950c52cce0ae175a5daff97c7d60a5a565b0fdee86f2
 - Created: 2026-11-02
@@ -278,6 +282,7 @@ OK実装開始
 
 ## [DONE] 最新ビルドのアプリケーションをローカルPCでインストールするにはどうすればいいですか？
 - ID: T-edbbc70c9ea744db89db16346cd764d0
+- Archived: true
 - CodexPrompt: b394af79b8a0d191f73cd29b8c365bf6ae3082317585e726130e8e08c337844c
 - CodexSession: 3ad8dd5a49e36242a8521c494a3b310ee11a31f4403f0807c8d2f83751ed7217
 - Created: 2026-11-02
@@ -294,6 +299,7 @@ OK実装開始
 
 ## [DONE] Brew のCaskとして配信するスクリプトがデバッグビルドになっていないか？
 - ID: T-452711bf52a945c19acf75fa6ed4530d
+- Archived: true
 - CodexPrompt: db4289ead1f6471cfaaa45ac75d833d47f8b601c2662c7a7a2fb07ab062358e0
 - CodexSession: bcb248c6aacf06f5122fac9654dfec89a9f47cade3b23a62f46763f016755ee3
 - Created: 2026-11-02
@@ -337,6 +343,7 @@ Brew のCaskとして配信するスクリプトがデバッグビルドにな�
 
 ## [DONE] Enter送信の有無は左右シフトどちらかを押下しているかどうかで切り替え可能にしてください
 - ID: T-370d7d065e7542a5b715f39b58a3115d
+- Archived: true
 - CodexPrompt: b1a9ac97ce63fb5fefbe13693ac488ed4af262a6acf55bd48f9c4f788aa1d415
 - CodexSession: 6cbef0a0375e7dce728c268300cb10030790387e51841442d573a5ce1287116e
 - Created: 2026-11-02
@@ -380,6 +387,7 @@ Enter送信の有無は左右シフトどちらかを押下しているかどう
 
 ## [DONE] メニューバーの権限を再確認で、設定パネルも開くようにして
 - ID: T-625b177ac21f44049cecb87e9971e7c0
+- Archived: true
 - CodexPrompt: 6a279ed977970e01e1c85b43fd4f122b83169fa36e54a37b9fcb0defb421051b
 - CodexSession: dcbf07156b5a189d50fad6f422eb0f0e1a20818220b38e96b22458f7adcb2f53
 - Created: 2026-11-02
@@ -407,6 +415,7 @@ Enter送信の有無は左右シフトどちらかを押下しているかどう
 
 ## [DONE] 設定画面のUIを再構築して。
 - ID: T-512d961e31aa45d592e52654192ab544
+- Archived: true
 - CodexPrompt: 9543d8762e1c3e4bebcdeb873462ac58a0738e733fdf16ffe274fa7d95ddc40a
 - CodexSession: a5a984a770137988bb84c6b3c7a745dc1f1bbb6c10c21b6f7c35707ee38412c1
 - Created: 2026-11-02
@@ -456,6 +465,7 @@ MacOSの標準UIを使用している？
 
 ## [DONE] EN/JPの双方に対応して
 - ID: T-53d49898e5fa4109bc6b5636fa92215e
+- Archived: true
 - CodexPrompt: 6009d6f7e613067f68492927a64d60b7fefb2575e6d2d58f809e926c71771231
 - CodexSession: 7af95dc768b3d006d7fa628de9f1a04b438d2f12fbbe580f9d26edbffa89d784
 - Created: 2026-11-02
@@ -473,6 +483,7 @@ EN/JPの双方に対応して
 
 ## [DONE] スクリプトの起動をMiseに移管してください
 - ID: T-5cfc4efbcc50437e9c653fcabbb6c8a7
+- Archived: true
 - CodexPrompt: 5c399f6e83015d1f173982c94d49da92b3466a1da6c762f32daae42a64bba287
 - CodexSession: 12e9e4213486d9f987bbf356aad00a7c08bf907da55e9425c53526e83db2c004
 - Created: 2026-11-02
@@ -499,6 +510,7 @@ buildとinstall-localを両方するものも用意して
 
 ## [DONE] メニューバーだけで簡単に挙動を切り替えできるように設定はメニューバーにも追加して
 - ID: T-493a31ce0cb54156953349fea5ad3283
+- Archived: true
 - CodexPrompt: 1e80456ae05317f8c508a206f152d301b1e8b9044117013510133fed48c0f2ba
 - CodexSession: 4848494132bd6d53688e8bf3bac11f994c929834eea098afc493fe6180a65715
 - Created: 2026-11-02
@@ -516,6 +528,7 @@ AboutやVersionの更新もできるようにして
 
 ## [DONE] レックやレコーディングなどのテキスト表示の場合、その文字も一緒に赤くしてほしいです。
 - ID: T-89909cb48f1f4e74a8533050dddb8085
+- Archived: true
 - CodexPrompt: a5fa918107ff73e149f8811bd5fdc90133e9514e56cfcf34532dd8b7a017ef82
 - CodexSession: 52d811e3f6c7046feaac86e84bf8ed93fc27d2b366f1ffde6315539dd63219e8
 - Created: 2026-11-02
@@ -532,6 +545,7 @@ AboutやVersionの更新もできるようにして
 
 ## [DONE] チェックナウと再起動を1つのボタンにまとめましょう。
 - ID: T-bf2bf3ca3ba84c369f5f1f4fa0b6025e
+- Archived: true
 - CodexPrompt: b49086f6e0ac7a9d834e6a3db4896addabf1e4ce78838d6ce85e725f6c76fa87
 - CodexSession: 2126fefe6626dd497eb0f43c34891cbc8efe00faa0efc77544b197e89cec0543
 - Created: 2026-11-02
@@ -549,6 +563,7 @@ AboutやVersionの更新もできるようにして
 
 ## [DONE] バージョン情報はどこで規定していますか？
 - ID: T-f95839fee12940e08d047c6fe2c1ce24
+- Archived: true
 - CodexPrompt: a16697bfd164ec21d521b45df2ef6e7fff094b3e4befdcf97a1d6cdd5dc45d98
 - CodexSession: 5cb4ec058ab7c1111a6b8fa5f1a491176527998ffc2469de8d889952c88c17aa
 - Created: 2026-11-02
@@ -586,6 +601,7 @@ Versionの自動更新を行うBump機能をMiseに追加
 
 ## [DONE] 入力後にエンターを入力する場合、1.2秒など待つと思います。そのタイミングで表示するポップアップはマイクではなくコメントのようなドットのものなのですが.が123と増えていくようにアニメーションにしてほしいです。
 - ID: T-0cee345546764d999ffa54c3147a5f50
+- Archived: true
 - CodexPrompt: 7771bf81a4fa434b8cc500d9e263119f8120b11cdc9ebbc4cbc8dc4006aa400e
 - CodexSession: 6f6d3d109471b902db5b0373bae96235fa273a63f63893d2ea45c5070da1f1fe
 - Created: 2026-11-02
@@ -616,8 +632,9 @@ TcktもDONEに遷移
 ### Comments
 - Enter送信前の確定待ちポップアップを、吹き出し内のドットが0.3秒ごとに1→2→3個と繰り返す表示に変更。待機終了・録音再開・非表示時にタイマーを停止し、次の待機は1個から開始。既存の他変更を保持。Swiftビルド（/tmpの独立scratch、native build system）とgit diff --check成功。実アプリでの表示確認・インストールは未実施。
 
-## [IN_REVIEW] Enter ~~ By Defaultのテキストに違和感あります
+## [DONE] Enter ~~ By Defaultのテキストに違和感あります
 - ID: T-c7cfb00dd4c44f3294b4b43412d4baa8
+- Archived: true
 - CodexPrompt: 379d17b882588503011749f652339a60a4ad07353f66f82cf5f23d6347c85b85
 - CodexSession: 7f980aceb748db0e91e3f804690668a9b261881003ef5d12779ff8160ee12fb3
 - Created: 2026-11-02
@@ -633,8 +650,9 @@ Enter ~~ By Defaultのテキストに違和感あります
 ### Comments
 - 設定画面とクイック設定の名称から「by default」「通常は」を削除し、Send Enter after dictation／終了後にEnterを送るに統一。swift test --filter LocalizationTests（3件）とビルド、git diff --check成功。実画面は未確認。
 
-## [IN_REVIEW] 添付アイコンをPush2Talkアプリに設定する
+## [DONE] 添付アイコンをPush2Talkアプリに設定する
 - ID: T-624c05f14aa64de1a162167730eb1686
+- Archived: true
 - CodexPrompt: db0984ec3246da7100f9aaf4069759ea22a5f246e86339461c7c4909cdbc4c46
 - CodexSession: 664a7ad55915bfb060e1ae02803e2c826a6c515a4c259f2e4ea05524ac0adb47
 - Created: 2026-11-02
@@ -687,8 +705,9 @@ Alt-Tabでもアプリ画像が表示されません
 - [Task] About画面のアイコン欠落への対応として、起動時に同梱ICNSをNSApp.applicationIconImageへ読み込み、AboutPanelのapplicationIconにも明示指定。日英の説明文を特定キーに依存しない表現へ変更。mise run bundle/test成功、install-localで/Applicationsのアプリ更新・再起動、バイナリ一致と署名検証・git diff --check確認。About画面の実表示の目視確認は未実施。
 - [Task] アイコン経路を点検。同梱ICNS・CFBundleIconFile・About指定・配布bundleは設定済み。AltTabAltの実装はNSRunningApplication.iconをPID単位でキャッシュ。install-localにtouchとlsregister -fによるアプリ単体の登録更新を起動前に追加し、実行してPush2Talkを再起動（PID 59919→73133）。NSWorkspace.icon(forFile:)とNSRunningApplication.iconを128px PNGへ描画し、どちらも添付P.アイコンであることを目視確認。plist・署名・git diff --check成功。AltTabAlt実画面の表示自体は未確認、原因をキャッシュと断定はしない。
 
-## [IN_REVIEW] $ [[ "${P2T_VERSION+x}" != x ]] || { echo 'P2T_VERSION is no longer supported. Use mise run bump:patch to update packagi
+## [DONE] $ [[ "${P2T_VERSION+x}" != x ]] || { echo 'P2T_VERSION is no longer supported. Use mise run bump:patch to update packagi
 - ID: T-d0ce6cada1ee406bb0924c020eabb35b
+- Archived: true
 - CodexPrompt: 75f4aa12ebb6a176840ea42095ab063aa2c0f380d15c9905917ed3bb85c730f0
 - CodexSession: edf0dc8c4df86f0c4024c93782dd9221d5e2305bed879f836a2533a1b446b426
 - Created: 2026-11-02
@@ -761,8 +780,10 @@ $ [[ "${P2T_VERSION+x}" != x ]] || { echo 'P2T_VERSION is no longer supported. U
 - .github/workflows/check.yml を削除し、空のディレクトリも削除。リポジトリ内にワークフローへの参照がないことと git diff --check 成功を確認。他プロジェクトでも .github/workflows を使用しない基本ルールを永続メモリに保存。
 - [Question] 削除の影響を確認。ワークフローはpush/PR時のテスト・Universalビルド・Cask生成とartifact保存のみで、実行時依存なし。配布用miseタスクと更新確認は独立。削除後のSwiftビルドと全テスト成功（sandbox制約のため--disable-sandbox、一時ビルド先使用）、git diff --check成功。README.md:162にCI説明が残ることを確認（調査のみで未変更）。GitHub main保護設定はAPIがBranch not foundのため確認できず。実機音声入力・Universal配布処理全体は未再実行。
 
-## [IN_REVIEW] Homebrew 向けのリリースを一つのコマンドでできるようにまとめてほしい
+## [DONE] Homebrew 向けのリリースを一つのコマンドでできるようにまとめてほしい
 - ID: T-e05481383d1a437384c5f3484a3180c7
+- Archived: true
+- CodexArchivedSession: 8e577441328840b04c19d9bfd8673323de943f582343dc9357abf88e7b82cd70
 - CodexPrompt: 345dd50d08f7dd7b4a492f9af1eeb8a60eba47c54bce5e29bc62a4b39bf6eed2
 - CodexSession: 8e577441328840b04c19d9bfd8673323de943f582343dc9357abf88e7b82cd70
 - Created: 2026-11-02
@@ -775,6 +796,31 @@ AltTabAltを参考にして
 
 ```
 
+<!-- tckt-subtask:4af1550e5bb3302db2a7a289d433563b145093cb10448481bd1d83af77831cf8 -->
+- [ ] [Question] 逆に不要になったスクリプトが残っていませんか？
+
+```text
+逆に不要になったスクリプトが残っていませんか？
+
+```
+
 ### Comments
 - AltTabAltを参考に公開処理をscripts/release-homebrew.shへ集約しmise run release/直接実行に対応、公開先確認をビルド前へ移動、READMEと配布手順を更新。Swift 38件・Universalビルド・署名・ZIP SHA-256・Cask構文成功。公開モック6シナリオ成功。GitHub実公開・公証・実機動作は未実施。
+- [Question] scripts全3件とMise/README/配布手順の呼び出し関係を確認。release-homebrew.shはreleaseから、bump-version.shはbump3タスクから、generate-app-icon.shはbundleから使用中。prepare-homebrewはrelease内部で必要、prepare-releaseはrelease --prepareへの別名。未使用の旧公開スクリプトや公開処理の二重定義は残っていないため削除なし。
+
+## [IN_REVIEW] 長押しをやめても、音声入力が停止しないことがあります
+- ID: T-269ae59a96f44020a11f3de150cdbb89
+- CodexPrompt: 954ff7b2e6b857d8db4d949c808e8f6c86209cc987cdb43f602333bec51ee8aa
+- CodexSession: cc195d64b46c2640c1a30b5d77dcda4813df420e1a23972c12bb8628ccf162ee
+- Created: 2026-11-02
+- Source: Codex
+- Type: Task
+
+```text
+長押しをやめても、音声入力が停止しないことがあります
+
+```
+
+### Comments
+- 右Option解放通知の取りこぼしで最大60秒継続する経路に対し、25ms周期で物理キー状態を照合して解放を補完し、解放処理を開始条件ガードより先に実行するよう修正。通知欠落時の停止・重複抑制・Shift動作・監視終了時の破棄の回帰テスト追加。swift test --disable-sandbox（/tmpのscratch/cache使用）全40件成功、実行ファイルのビルドとgit diff --check成功。実際のmacOS音声入力・インストール済みアプリでの動作は未確認、アプリ差し替えやリリースは未実施。
 
