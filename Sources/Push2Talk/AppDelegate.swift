@@ -190,6 +190,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // Update the hold indicator even when Dictation cannot start in the current context.
     updateStatus()
     defer { updateStatus() }
+    // Releasing an existing session must not depend on permission/setup checks
+    // used to authorize a new session. The tick still guards event posting.
+    if !down {
+      session.release(at: now, shiftHeld: shiftHeld)
+      return
+    }
     guard !isRestarting, !paused else { reportOperation(L10n.text("開始できません: 一時停止中です")); return }
     guard keyboard.isRunning, settings.setupComplete else {
       reportOperation(L10n.text("開始できません: 初期設定とキー監視の状態を確認してください")); return
@@ -200,28 +206,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     guard AXIsProcessTrusted(), CGPreflightPostEventAccess() else {
       reportOperation(L10n.text("開始できません: アクセシビリティとキー送信の権限を確認してください")); return
     }
-    if down {
-      guard session.phase == .idle else { return }
-      let flags = CGEventSource.flagsState(.hidSystemState)
-      guard flags.intersection([.maskControl, .maskCommand, .maskSecondaryFn]).isEmpty,
-        flags.rawValue & 0x20 == 0
-      else { reportOperation(L10n.text("開始しません: ほかの修飾キーを離してから右Optionを押してください")); return }
-      guard let focus = FocusTarget.capture() else {
-        reportOperation(L10n.text("開始しません: 別アプリの入力欄を選んでください（パスワード欄は対象外です）")); return
-      }
-      target = focus
-      session.settleDelay = settings.settleDelay
-      session.sendEnter = settings.sendEnter
-      session.press(at: now)
-      reportOperation(focus.canSubmitAutomatically
-        ? L10n.text("長押しを確認中です")
-        : L10n.text("長押しを確認中です（入力欄情報を取得できないため、自動Enterは送りません）"))
-    } else {
-      session.release(at: now, shiftHeld: shiftHeld)
+    guard session.phase == .idle else { return }
+    let flags = CGEventSource.flagsState(.hidSystemState)
+    guard flags.intersection([.maskControl, .maskCommand, .maskSecondaryFn]).isEmpty,
+      flags.rawValue & 0x20 == 0
+    else { reportOperation(L10n.text("開始しません: ほかの修飾キーを離してから右Optionを押してください")); return }
+    guard let focus = FocusTarget.capture() else {
+      reportOperation(L10n.text("開始しません: 別アプリの入力欄を選んでください（パスワード欄は対象外です）")); return
     }
+    target = focus
+    session.settleDelay = settings.settleDelay
+    session.sendEnter = settings.sendEnter
+    session.press(at: now)
+    reportOperation(focus.canSubmitAutomatically
+      ? L10n.text("長押しを確認中です")
+      : L10n.text("長押しを確認中です（入力欄情報を取得できないため、自動Enterは送りません）"))
   }
 
   private func tick() {
+    keyboard.reconcileHoldState()
     if !AXIsProcessTrusted(), keyboard.isRunning {
       cancel()
       keyboard.stop()

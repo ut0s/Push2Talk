@@ -5,6 +5,61 @@ import XCTest
 
 final class KeyboardBridgeTests: XCTestCase {
   @MainActor
+  func testLostReleaseStopsSessionOnceAndPreservesShiftChoice() async {
+    let bridge = KeyboardBridge()
+    var session = HoldSession()
+    let pressed = expectation(description: "Press delivered")
+    let released = expectation(description: "Recovered release delivered")
+    var transitions: [Bool] = []
+    bridge.onHold = { down, shiftHeld in
+      transitions.append(down)
+      if down {
+        session.press(at: 0)
+        pressed.fulfill()
+      } else {
+        session.release(at: 1, shiftHeld: shiftHeld)
+        released.fulfill()
+      }
+    }
+    _ = bridge.handle(.flagsChanged, event(key: 61, flags: CGEventFlags(rawValue: 0x80040)))
+    await fulfillment(of: [pressed], timeout: 1)
+    XCTAssertEqual(session.tick(at: 0.2), [.start])
+    bridge.reconcileHoldState(rightOptionDown: true, shiftHeld: false)
+    XCTAssertTrue(bridge.isRightOptionHeld)
+    // No flagsChanged release arrives; the physical key check recovers it.
+    bridge.reconcileHoldState(rightOptionDown: false, shiftHeld: true)
+    bridge.reconcileHoldState(rightOptionDown: false, shiftHeld: false)
+    XCTAssertFalse(bridge.isRightOptionHeld)
+    await fulfillment(of: [released], timeout: 1)
+    XCTAssertEqual(transitions, [true, false])
+    XCTAssertEqual(session.tick(at: 1), [.stop])
+    XCTAssertEqual(session.tick(at: 2), [.enter])
+    // A delayed native release must not deliver another transition.
+    _ = bridge.handle(.flagsChanged, event(key: 61))
+    let drained = expectation(description: "Late release processed")
+    DispatchQueue.main.async { drained.fulfill() }
+    await fulfillment(of: [drained], timeout: 1)
+    XCTAssertEqual(transitions, [true, false])
+    bridge.stop()
+  }
+
+  @MainActor
+  func testReconciliationNeverSynthesizesAPressAndStopDiscardsRecovery() async {
+    let bridge = KeyboardBridge()
+    var called = false
+    bridge.onHold = { _, _ in called = true }
+    bridge.reconcileHoldState(rightOptionDown: true, shiftHeld: false)
+    XCTAssertFalse(bridge.isRightOptionHeld)
+    _ = bridge.handle(.flagsChanged, event(key: 61, flags: .maskAlternate))
+    bridge.reconcileHoldState(rightOptionDown: false, shiftHeld: false)
+    bridge.stop()
+    let drained = expectation(description: "Main queue drained")
+    DispatchQueue.main.async { drained.fulfill() }
+    await fulfillment(of: [drained], timeout: 1)
+    XCTAssertFalse(called)
+  }
+
+  @MainActor
   func testEitherShiftPassesThroughWithoutCancellingAndIsCapturedAtRelease() async {
     for shiftKey in [CGKeyCode(56), CGKeyCode(60)] {
       let bridge = KeyboardBridge()

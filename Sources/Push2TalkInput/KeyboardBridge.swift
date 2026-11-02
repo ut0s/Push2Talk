@@ -28,6 +28,23 @@ public final class KeyboardBridge {
   }
   public var secureInputEnabled: Bool { IsSecureEventInputEnabled() }
 
+  public func reconcileHoldState() {
+    guard isRightOptionHeld else { return }
+    reconcileHoldState(
+      rightOptionDown: CGEventSource.keyState(.hidSystemState, key: 61),
+      shiftHeld: CGEventSource.flagsState(.hidSystemState).contains(.maskShift))
+  }
+
+  func reconcileHoldState(rightOptionDown: Bool, shiftHeld: Bool) {
+    // Recover a lost release without synthesizing presses or relying on the
+    // aggregate Option flag, which may still be set by the left Option key.
+    guard !rightOptionDown else { return }
+    let released = stateLock.withLock {
+      optionState.update(keyCode: 61, flags: 0) == false
+    }
+    if released { deliver { $0.onHold?(false, shiftHeld) } }
+  }
+
   public var isRunning: Bool {
     guard let tap else { return false }
     return CFMachPortIsValid(tap) && CGEvent.tapIsEnabled(tap: tap)
