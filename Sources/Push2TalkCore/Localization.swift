@@ -50,7 +50,7 @@ public enum L10n {
     "クイック設定": "Quick Settings",
     "Push2Talkについて…": "About Push2Talk…",
     "アップデートを確認…": "Check for Updates…",
-    "右Optionを長押ししてmacOSの音声入力を使います。": "Hold Right Option to use macOS Dictation.",
+    "キーを長押ししてmacOSの音声入力を使います。": "Hold a key to use macOS Dictation.",
     "開発ビルド": "Development build",
     "開発ビルドです": "This is a development build",
     "配布版のバージョン情報がありません。公開済みのリリースを確認できます。": "This build has no release version metadata. You can view published releases.",

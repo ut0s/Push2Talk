@@ -52,6 +52,8 @@ mise run build-install
 
 タスク一覧は`mise tasks`で確認できます。ビルド・インストール・配布の処理は`mise.toml`で管理します。
 
+アプリアイコンの元画像は`packaging/AppIcon.png`です。`mise run bundle`で各サイズを生成して`AppIcon.icns`に変換し、アプリに組み込みます。
+
 初回起動時の設定画面で次を設定してください。
 
 1. macOS「システム設定」→「キーボード」→「音声入力」をオンにする。

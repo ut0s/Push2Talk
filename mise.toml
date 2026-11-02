@@ -71,6 +71,7 @@ app="$PWD/dist/Push2Talk.app"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp packaging/Info.plist "$app/Contents/Info.plist"
+/bin/bash scripts/generate-app-icon.sh packaging/AppIcon.png "$app/Contents/Resources/AppIcon.icns"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" "$app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $version" "$app/Contents/Info.plist"
 
@@ -149,6 +150,9 @@ if pgrep -x Push2Talk >/dev/null; then
 fi
 ditto "$source_app" "$target_app"
 codesign --verify --strict "$target_app"
+# Refresh bundle metadata before other apps request the new process's icon.
+touch "$target_app"
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$target_app"
 if [[ "$launch_app" == 1 ]]; then
   open "$target_app" --args --settings
 fi

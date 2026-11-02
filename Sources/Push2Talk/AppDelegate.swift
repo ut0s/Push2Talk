@@ -25,6 +25,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var observers: [NSObjectProtocol] = []
 
   func applicationDidFinishLaunching(_ notification: Notification) {
+    if let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+       let icon = NSImage(contentsOf: iconURL) {
+      NSApp.applicationIconImage = icon
+    }
     paused = CommandLine.arguments.contains("--paused")
     statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     statusItem.button?.image = settings.menuBarIcon.image(symbol: "mic.slash", description: "Push2Talk")
@@ -144,12 +148,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   @objc private func showAbout() {
     cancel()
     NSApp.activate(ignoringOtherApps: true)
-    NSApp.orderFrontStandardAboutPanel(options: [
+    var options: [NSApplication.AboutPanelOptionKey: Any] = [
       .applicationName: "Push2Talk",
       .applicationVersion: updates.version,
       .version: updates.build,
-      .credits: NSAttributedString(string: L10n.text("右Optionを長押ししてmacOSの音声入力を使います。")),
-    ])
+      .credits: NSAttributedString(string: L10n.text("キーを長押ししてmacOSの音声入力を使います。")),
+    ]
+    if let icon = NSApp.applicationIconImage {
+      options[.applicationIcon] = icon
+    }
+    NSApp.orderFrontStandardAboutPanel(options: options)
   }
 
   @objc private func checkForUpdates() {
