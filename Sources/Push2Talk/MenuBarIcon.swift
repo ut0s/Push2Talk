@@ -1,3 +1,4 @@
+import Push2TalkCore
 import AppKit
 
 enum MenuBarIcon: String, CaseIterable {
@@ -5,8 +6,8 @@ enum MenuBarIcon: String, CaseIterable {
 
   var title: String {
     switch self {
-    case .microphone: return "マイク"
-    case .walkieTalkie: return "トランシーバー"
+    case .microphone: return L10n.text("マイク")
+    case .walkieTalkie: return L10n.text("トランシーバー")
     }
   }
 
