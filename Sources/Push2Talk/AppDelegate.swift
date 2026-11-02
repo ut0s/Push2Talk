@@ -545,6 +545,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     settingsWindow = nil
     settingsControls.removeAll()
     permissionStatusView = nil
+    // Relinquish activation so macOS returns focus to the previous application.
+    NSApp.hide(nil)
   }
 
   private func setLanguage(_ language: AppLanguage) {
