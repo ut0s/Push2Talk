@@ -4,7 +4,7 @@ import Push2TalkCore
 import Push2TalkInput
 import ServiceManagement
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   private let settings = Settings()
   private let statusPopup = StatusPopup()
   private let keyboard = KeyboardBridge()
@@ -388,6 +388,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
     window.title = L10n.text("Push2Talk 設定")
     window.isReleasedWhenClosed = false
+    window.delegate = self
     window.contentMinSize = NSSize(width: 620, height: 480)
     let layout = SettingsLayout()
     window.contentView = layout
@@ -499,15 +500,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     setLanguage(AppLanguage.allCases[sender.indexOfSelectedItem])
   }
 
+  func windowWillClose(_ notification: Notification) {
+    guard let window = notification.object as? NSWindow, window === settingsWindow else { return }
+    // Do not retain a closed settings window or any of its controls.
+    settingsWindow = nil
+    settingsControls.removeAll()
+    permissionStatusView = nil
+  }
+
   private func setLanguage(_ language: AppLanguage) {
     cancel()
     L10n.language = language
     let wasVisible = settingsWindow?.isVisible == true
     let frame = settingsWindow?.frame
     settingsWindow?.close()
-    settingsWindow = nil
-    settingsControls.removeAll()
-    permissionStatusView = nil
     rebuildMenu()
     if wasVisible {
       showSettings()
