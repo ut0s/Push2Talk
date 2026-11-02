@@ -616,3 +616,20 @@ TcktもDONEに遷移
 ### Comments
 - Enter送信前の確定待ちポップアップを、吹き出し内のドットが0.3秒ごとに1→2→3個と繰り返す表示に変更。待機終了・録音再開・非表示時にタイマーを停止し、次の待機は1個から開始。既存の他変更を保持。Swiftビルド（/tmpの独立scratch、native build system）とgit diff --check成功。実アプリでの表示確認・インストールは未実施。
 
+## [IN_REVIEW] Enter ~~ By Defaultのテキストに違和感あります
+- ID: T-c7cfb00dd4c44f3294b4b43412d4baa8
+- CodexPrompt: 379d17b882588503011749f652339a60a4ad07353f66f82cf5f23d6347c85b85
+- CodexSession: 7f980aceb748db0e91e3f804690668a9b261881003ef5d12779ff8160ee12fb3
+- Created: 2026-11-02
+- Source: Codex
+- Type: Task
+
+```text
+Enter ~~ By Defaultのテキストに違和感あります
+不要では？
+
+```
+
+### Comments
+- 設定画面とクイック設定の名称から「by default」「通常は」を削除し、Send Enter after dictation／終了後にEnterを送るに統一。swift test --filter LocalizationTests（3件）とビルド、git diff --check成功。実画面は未確認。
+
