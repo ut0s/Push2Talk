@@ -11,6 +11,9 @@ public final class KeyboardBridge {
   private var tap: CFMachPort?
   private var runLoopSource: CFRunLoopSource?
   private var optionState = RightOptionState()
+  private enum PhysicalOptionKey { case left, right }
+  private var physicalOptionKey: PhysicalOptionKey?
+  private var hasPhysicalOptionSample = false
   private var lastOptionEvent: (code: Int64, flags: UInt64)?
   private let stateLock = NSLock()
   private var eventThread: Thread?
@@ -30,23 +33,38 @@ public final class KeyboardBridge {
 
   public func reconcileHoldState() {
     guard isRightOptionHeld else { return }
-    let flags = CGEventSource.flagsState(.hidSystemState)
-    let altHeld = flags.contains(.maskAlternate)
-    let key61Down = CGEventSource.keyState(.hidSystemState, key: 61)
-    let rightOptionDown = altHeld && (key61Down || (flags.rawValue & 0x40 != 0) || (flags.rawValue & 0x60 == 0))
     reconcileHoldState(
-      rightOptionDown: rightOptionDown,
-      shiftHeld: flags.contains(.maskShift))
+      rightOptionDown: CGEventSource.keyState(.hidSystemState, key: 61),
+      leftOptionDown: CGEventSource.keyState(.hidSystemState, key: 58),
+      shiftHeld: CGEventSource.flagsState(.hidSystemState).contains(.maskShift))
   }
 
-  func reconcileHoldState(rightOptionDown: Bool, shiftHeld: Bool) {
-    // Recover a lost release without synthesizing presses or relying on the
-    // aggregate Option flag, which may still be set by the left Option key.
-    guard !rightOptionDown else { return }
+  func reconcileHoldState(rightOptionDown: Bool, leftOptionDown: Bool = false, shiftHeld: Bool) {
     let released = stateLock.withLock {
-      optionState.update(keyCode: 61, flags: 0) == false
+      guard optionState.isHeld else { return false }
+      if !hasPhysicalOptionSample {
+        // Logical right Option can be backed by physical left Option after a
+        // remap. Calibrate before Dictation posts its synthetic modifiers.
+        hasPhysicalOptionSample = true
+        if rightOptionDown != leftOptionDown {
+          physicalOptionKey = rightOptionDown ? .right : .left
+        }
+        return false
+      }
+      // Posted shortcuts overwrite HID modifier flags even while the physical
+      // key stays down. Only poll the physical key identified for this hold.
+      // If it cannot be identified, keep relying on native release events.
+      guard let physicalOptionKey else { return false }
+      let down = physicalOptionKey == .right ? rightOptionDown : leftOptionDown
+      guard !down else { return false }
+      optionState.reset()
+      self.physicalOptionKey = nil
+      hasPhysicalOptionSample = false
+      return true
     }
-    if released { deliver { $0.onHold?(false, shiftHeld) } }
+    if released {
+      deliver { $0.onHold?(false, shiftHeld) }
+    }
   }
 
   public var isRunning: Bool {
@@ -101,6 +119,8 @@ public final class KeyboardBridge {
     let loop = stateLock.withLock { () -> CFRunLoop? in
       generation += 1
       optionState.reset()
+      physicalOptionKey = nil
+      hasPhysicalOptionSample = false
       let loop = eventRunLoop
       eventRunLoop = nil
       return loop
@@ -121,7 +141,11 @@ public final class KeyboardBridge {
   // This runs on the event thread. Never call AX, TCC, AppKit, or user callbacks here.
   func handle(_ type: CGEventType, _ event: CGEvent) -> Unmanaged<CGEvent>? {
     if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-      stateLock.withLock { optionState.reset() }
+      stateLock.withLock {
+        optionState.reset()
+        physicalOptionKey = nil
+        hasPhysicalOptionSample = false
+      }
       deliver { bridge in
         bridge.onCancel?(false)
         if let tap = bridge.tap { CGEvent.tapEnable(tap: tap, enable: true) }
@@ -144,7 +168,13 @@ public final class KeyboardBridge {
       }
     }
     if type == .flagsChanged && code == 61 {
-      if let down = stateLock.withLock({ optionState.update(keyCode: code, flags: event.flags.rawValue) }) {
+      let down = stateLock.withLock { () -> Bool? in
+        guard let down = optionState.update(keyCode: code, flags: event.flags.rawValue) else { return nil }
+        physicalOptionKey = nil
+        hasPhysicalOptionSample = false
+        return down
+      }
+      if let down {
         NSLog("Push2Talk: right Option event down=%@ flags=0x%llx", String(down), event.flags.rawValue)
         let shiftHeld = event.flags.contains(.maskShift)
         deliver { $0.onHold?(down, shiftHeld) }

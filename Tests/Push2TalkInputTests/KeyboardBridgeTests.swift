@@ -51,6 +51,7 @@ final class KeyboardBridgeTests: XCTestCase {
     bridge.reconcileHoldState(rightOptionDown: true, shiftHeld: false)
     XCTAssertFalse(bridge.isRightOptionHeld)
     _ = bridge.handle(.flagsChanged, event(key: 61, flags: .maskAlternate))
+    bridge.reconcileHoldState(rightOptionDown: true, shiftHeld: false)
     bridge.reconcileHoldState(rightOptionDown: false, shiftHeld: false)
     bridge.stop()
     let drained = expectation(description: "Main queue drained")
@@ -60,17 +61,82 @@ final class KeyboardBridgeTests: XCTestCase {
   }
 
   @MainActor
-  func testReconcileHoldStateWithoutPhysicalHoldRecoversRelease() async {
+  func testMappedLeftOptionSurvivesSyntheticShortcutAndRecoversMissingRelease() async {
     let bridge = KeyboardBridge()
+    let pressed = expectation(description: "Mapped press delivered")
     let released = expectation(description: "Recovered release delivered")
+    var transitions: [Bool] = []
     bridge.onHold = { down, _ in
-      if !down { released.fulfill() }
+      transitions.append(down)
+      if down { pressed.fulfill() } else { released.fulfill() }
     }
-    _ = bridge.handle(.flagsChanged, event(key: 61, flags: CGEventFlags(rawValue: 0x80040)))
+    // Real-device trace: logical right Option, physical key 58, then HID flags
+    // become 0x20000000 when the Dictation shortcut is posted.
+    _ = bridge.handle(.flagsChanged, event(key: 61, flags: CGEventFlags(rawValue: 0x80140)))
+    bridge.reconcileHoldState(rightOptionDown: false, leftOptionDown: true, shiftHeld: false)
+    await fulfillment(of: [pressed], timeout: 1)
+    let shortcut = event(key: 54, flags: CGEventFlags(rawValue: 0x20100010))
+    shortcut.setIntegerValueField(.eventSourceUserData, value: KeyboardBridge.marker)
+    _ = bridge.handle(.flagsChanged, shortcut)
+    let shortcutRelease = event(key: 54, flags: CGEventFlags(rawValue: 0x20000000))
+    shortcutRelease.setIntegerValueField(.eventSourceUserData, value: KeyboardBridge.marker)
+    _ = bridge.handle(.flagsChanged, shortcutRelease)
+    for _ in 0..<120 {
+      bridge.reconcileHoldState(rightOptionDown: false, leftOptionDown: true, shiftHeld: false)
+    }
     XCTAssertTrue(bridge.isRightOptionHeld)
-    bridge.reconcileHoldState()
+    XCTAssertEqual(transitions, [true])
+    bridge.reconcileHoldState(rightOptionDown: false, leftOptionDown: false, shiftHeld: false)
     XCTAssertFalse(bridge.isRightOptionHeld)
     await fulfillment(of: [released], timeout: 1)
+    XCTAssertEqual(transitions, [true, false])
+    bridge.stop()
+  }
+
+  @MainActor
+  func testPhysicalRightReleaseIsRecoveredWhileLeftOptionRemainsDown() async {
+    let bridge = KeyboardBridge()
+    let released = expectation(description: "Right key release delivered")
+    bridge.onHold = { down, _ in if !down { released.fulfill() } }
+    _ = bridge.handle(.flagsChanged, event(key: 61, flags: CGEventFlags(rawValue: 0x80040)))
+    bridge.reconcileHoldState(rightOptionDown: true, leftOptionDown: false, shiftHeld: false)
+    bridge.reconcileHoldState(rightOptionDown: true, leftOptionDown: true, shiftHeld: false)
+    XCTAssertTrue(bridge.isRightOptionHeld)
+    bridge.reconcileHoldState(rightOptionDown: false, leftOptionDown: true, shiftHeld: false)
+    XCTAssertFalse(bridge.isRightOptionHeld)
+    await fulfillment(of: [released], timeout: 1)
+    bridge.stop()
+  }
+
+  @MainActor
+  func testUnknownPhysicalMappingWaitsForNativeRelease() async {
+    for bothDown in [false, true] {
+      let bridge = KeyboardBridge()
+      let released = expectation(description: "Native release delivered")
+      bridge.onHold = { down, _ in if !down { released.fulfill() } }
+      _ = bridge.handle(.flagsChanged, event(key: 61, flags: .maskAlternate))
+      bridge.reconcileHoldState(rightOptionDown: bothDown, leftOptionDown: bothDown, shiftHeld: false)
+      bridge.reconcileHoldState(rightOptionDown: false, leftOptionDown: false, shiftHeld: false)
+      XCTAssertTrue(bridge.isRightOptionHeld)
+      _ = bridge.handle(.flagsChanged, event(key: 61))
+      await fulfillment(of: [released], timeout: 1)
+      XCTAssertFalse(bridge.isRightOptionHeld)
+      bridge.stop()
+    }
+  }
+
+  @MainActor
+  func testPhysicalMappingIsRecalibratedForEachPress() async {
+    let bridge = KeyboardBridge()
+    _ = bridge.handle(.flagsChanged, event(key: 61, flags: .maskAlternate))
+    bridge.reconcileHoldState(rightOptionDown: false, leftOptionDown: true, shiftHeld: false)
+    _ = bridge.handle(.flagsChanged, event(key: 61))
+    _ = bridge.handle(.flagsChanged, event(key: 61, flags: .maskAlternate))
+    bridge.reconcileHoldState(rightOptionDown: true, leftOptionDown: false, shiftHeld: false)
+    bridge.reconcileHoldState(rightOptionDown: true, leftOptionDown: false, shiftHeld: false)
+    XCTAssertTrue(bridge.isRightOptionHeld)
+    bridge.reconcileHoldState(rightOptionDown: false, leftOptionDown: false, shiftHeld: false)
+    XCTAssertFalse(bridge.isRightOptionHeld)
     bridge.stop()
   }
 
