@@ -47,6 +47,8 @@ public enum L10n {
 
   // Japanese source strings are the stable lookup keys and the Japanese translations.
   static let english: [String: String] = [
+    "権限を反映するためPush2Talkを再起動します。設定画面に戻ります。": "Push2Talk will restart to apply permissions, then reopen Settings.",
+    "必要な権限の付与を検知すると、入力が落ち着いてから自動で再起動します。反映されない場合は「権限を再確認」で再起動してください。": "When new permissions are detected, Push2Talk restarts automatically after keyboard activity stops. If permissions do not update, use Check Permissions to restart.",
     "クイック設定": "Quick Settings",
     "Push2Talkについて…": "About Push2Talk…",
     "アップデートを確認…": "Check for Updates…",
