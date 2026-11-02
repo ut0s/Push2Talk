@@ -15,7 +15,8 @@ public struct HoldSession {
   public var startupGrace = 0.65
   public var settleDelay = 0.8
   public var maximumDuration = 60.0
-  public var sendEnter = true
+  public var sendEnter = false
+  private var submitOnFinish = false
 
   public init() {}
 
@@ -24,10 +25,13 @@ public struct HoldSession {
     phase = .arming(now + holdDelay)
   }
 
-  public mutating func release(at now: Double) {
+  public mutating func release(at now: Double, shiftHeld: Bool = false) {
     switch phase {
     case .arming: phase = .idle
-    case .recording(let started): phase = .stopping(max(now, started + startupGrace))
+    case .recording(let started):
+      // Snapshot the choice at release; later Shift changes must not alter it.
+      submitOnFinish = sendEnter != shiftHeld
+      phase = .stopping(max(now, started + startupGrace))
     default: break
     }
   }
@@ -44,7 +48,7 @@ public struct HoldSession {
       return [.stop]
     case .settling(let deadline) where now >= deadline:
       phase = .idle
-      return sendEnter ? [.enter] : []
+      return submitOnFinish ? [.enter] : []
     default: return []
     }
   }
