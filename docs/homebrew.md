@@ -67,7 +67,7 @@ P2T_CREATE_PUBLIC_REPO=1 mise run release
 コミット・pushします。ソースコードとそのGit履歴を配布リポジトリにコピーしません。
 公開リポジトリのコミットメッセージは英語のConventional Commit形式です。
 
-次回以降は`mise run bump:patch`、`mise run bump:minor`、`mise run bump:major`でplistのバージョンを上げてコミットし、実行します。
+次回以降は変更をコミットして作業ツリーをクリーンにしてから、`mise run bump:patch`、`mise run bump:minor`、`mise run bump:major`を実行します。plistのバージョン更新とコミットは自動で行います。未コミットの変更がある場合は、更新前にエラーで停止します。
 ビルド時に`CFBundleVersion`も同じ値に設定します。
 
 ```sh

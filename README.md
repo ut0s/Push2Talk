@@ -105,8 +105,9 @@ mise run bump:minor  # Increment minor: 0.1.1 -> 0.2.0
 mise run bump:major  # Increment major: 0.2.0 -> 1.0.0
 ```
 
-`bump:patch`・`bump:minor`・`bump:major`は指定した桁を1つ上げ、下位の桁を0に戻し、plistの`CFBundleShortVersionString`と`CFBundleVersion`を同じ値に更新します。更新する桁はコロン区切りのタスク名で指定します。ビルド・コミット・公開は行いません。
-更新したplistをコミットしてから`mise run release`を実行してください。ビルド・配布処理は常にplistからバージョンを読み取ります。
+`bump:patch`・`bump:minor`・`bump:major`は指定した桁を1つ上げ、下位の桁を0に戻し、plistの`CFBundleShortVersionString`と`CFBundleVersion`を同じ値に更新します。更新する桁はコロン区切りのタスク名で指定します。更新したplistだけを`chore(release): bump version to X.Y.Z`で自動コミットします。
+実行前に未コミットの変更（ステージ済み・未ステージ・未追跡ファイルを含む）がある場合は、エラーメッセージを表示して停止し、バージョン更新もコミットも行いません。先に変更をコミットするかstashしてください。コミットに失敗した場合はエラー終了し、更新したplistは確認・修正できるよう残ります。
+更新後は`mise run release`を実行してください。ビルド・配布処理は常にplistからバージョンを読み取ります。
 
 ## Homebrewでの配布
 
