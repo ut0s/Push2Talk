@@ -904,12 +904,20 @@ bump:patch のあと、他のプロジェクトを参考にしてコミットも
 ### Comments
 - AltTabAltを参考にbump共通スクリプトへクリーン作業ツリー検査とplist限定のchore(release)自動コミットを実装、patch/minor/majorと説明文を更新。一時Gitリポジトリの9ケース（各桁更新、未ステージ・ステージ済み・未追跡・削除・plist変更の拒否、フック失敗）通過、bash -n・git diff --check通過、実作業ツリーでも更新前エラーを確認。miseがPATHにないため直接スクリプトで検証。実リポジトリのバージョン更新・コミットは未実行。
 
-## [IN_PROGRESS] AltTabAltからWindowが無いときの表示は消えたが、右Optに反応しなくなっている。FIX
+## [DONE] AltTabAltからWindowが無いときの表示は消えたが、右Optに反応しなくなっている。FIX
 - ID: T-660a6570afeb4b719dfb55519984f8cb
 - Created: 2026-11-02
 - Type: Task
 
 ### Comments
 - 原因調査と修正を実施。設定ウィンドウを閉じた際にPush2Talk（accessoryアプリ）がアクティブ状態のまま保持され、FocusTarget.capture()がownPIDと一致してnilを返し右Option長押しが無視される問題を特定。windowWillCloseでNSApp.hide(nil)を呼び出して直前アプリケーションへ確実にフォーカスを返却するよう改修。全45テスト通過。
+- 右Option押下時に音声入力が始まらずアイコンがバツ（mic.slash）のままになる問題を修正。reconcileHoldStateのポーリングで修飾キーに対してfalseを返しがちなCGEventSource.keyState(61)に依存していたため、長押し判定（180ms）前に即座にリリース処理が呼ばれていた。flagsState(.maskAlternate)と左右修飾ビットを反映した判定に改善。またAppDelegate.holdにおける左Option除外条件を左Option単独押下時のみ除外するよう修正し、動作診断ログとユニットテストを追加。全46テスト通過。
 
+
+## [TODO] Puaseしているかどうかがわからない。Pauseしている場合は、斜線ではなく一時停止の二重線にしよう。
+- ID: T-70b7fb5dddb548049f515f4b6612e3dd
+- Created: 2026-11-02
+- Type: Task
+
+### Comments
 
