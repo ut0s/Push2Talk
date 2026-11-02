@@ -808,8 +808,10 @@ AltTabAltを参考にして
 - AltTabAltを参考に公開処理をscripts/release-homebrew.shへ集約しmise run release/直接実行に対応、公開先確認をビルド前へ移動、READMEと配布手順を更新。Swift 38件・Universalビルド・署名・ZIP SHA-256・Cask構文成功。公開モック6シナリオ成功。GitHub実公開・公証・実機動作は未実施。
 - [Question] scripts全3件とMise/README/配布手順の呼び出し関係を確認。release-homebrew.shはreleaseから、bump-version.shはbump3タスクから、generate-app-icon.shはbundleから使用中。prepare-homebrewはrelease内部で必要、prepare-releaseはrelease --prepareへの別名。未使用の旧公開スクリプトや公開処理の二重定義は残っていないため削除なし。
 
-## [IN_REVIEW] 長押しをやめても、音声入力が停止しないことがあります
+## [DONE] 長押しをやめても、音声入力が停止しないことがあります
 - ID: T-269ae59a96f44020a11f3de150cdbb89
+- Archived: true
+- CodexArchivedSession: cc195d64b46c2640c1a30b5d77dcda4813df420e1a23972c12bb8628ccf162ee
 - CodexPrompt: 954ff7b2e6b857d8db4d949c808e8f6c86209cc987cdb43f602333bec51ee8aa
 - CodexSession: cc195d64b46c2640c1a30b5d77dcda4813df420e1a23972c12bb8628ccf162ee
 - Created: 2026-11-02
@@ -824,8 +826,10 @@ AltTabAltを参考にして
 ### Comments
 - 右Option解放通知の取りこぼしで最大60秒継続する経路に対し、25ms周期で物理キー状態を照合して解放を補完し、解放処理を開始条件ガードより先に実行するよう修正。通知欠落時の停止・重複抑制・Shift動作・監視終了時の破棄の回帰テスト追加。swift test --disable-sandbox（/tmpのscratch/cache使用）全40件成功、実行ファイルのビルドとgit diff --check成功。実際のmacOS音声入力・インストール済みアプリでの動作は未確認、アプリ差し替えやリリースは未実施。
 
-## [IN_REVIEW] 相談
+## [DONE] 相談
 - ID: T-209a16ebf8b54f2b940b76d169a01954
+- Archived: true
+- CodexArchivedSession: 40e1242544262b65005cd3660f5a283cbb84bbd4d39968babadb8530b6a53d2c
 - CodexPrompt: 3c80792b0e401be77a3fcc706f2cdcf0c8cfa21beb6e732566d9cc6a413c00a4
 - CodexSession: 40e1242544262b65005cd3660f5a283cbb84bbd4d39968babadb8530b6a53d2c
 - Created: 2026-11-02
@@ -912,11 +916,21 @@ AltTabAltの判定を改善する	他のアプリにも対応できる。最小�
 
 ```
 
+<!-- tckt-subtask:579b90d2e5a74f656c4174d91da53cb80751d9c66a150a2beb7131d55938a452 -->
+- [ ] [Task] これはなぜ発生したのですか
+
+```text
+これはなぜ発生したのですか
+再発防止をしたい
+
+```
+
 ### Comments
 - 相談として調査。インストール済AltTabAlt 1.0.14のBuildCommitは手元HEAD 68651ebと一致。Push2Talkはaccessory/LSUIElement設定済み、設定窓を閉じても保持。AltTabAltはSpaceなしでもAXに残る窓をStage Manager救済として採用するため誤表示の候補。ブラックリストによる即時回避、Push2Talk側で閉じた設定窓を破棄、AltTabAlt側で閉鎖窓と別Space/最小化/Stage Managerを区別する改善を提案。コード・設定変更および実機再現確認は未実施。
 - [Task] 両リポジトリに実装。Push2TalkはNSWindowDelegateで閉じた設定窓・コントロール・権限UIの参照を解放し言語変更時も同経路に統一。AltTabAltは全画面の現在Spaceと成功したAX一覧を照合し、現在Spaceに残る閉鎖窓を除外、別SpaceのChromium窓・最小化・非表示・Stage Manager相当窓を保持、AX失敗/ID不明は未取得として扱う。Push2Talk全45テストと隔離AppKit検証（weak参照解放、CG残存窓alpha=0、再表示・選択タブ・言語変更時の位置復元）、AltTabAlt追加5テストと両diff check成功。他チャットの権限再起動変更は保持。インストール済アプリは未更新、実際のStage Manager/複数Space操作と権限付きAltTabAltでの統合確認は未実施。
 - 実機診断で原因特定：右Optionイベント(flags=0x80140)が物理key58で保持され、Dictation用Command送信直後にHID flagsが0x20000000へ変化。旧ポーリングが開始約27ms後に誤解放しアイコンも非押下へ戻る。押下ごとに物理Optionキーを較正し対応キーだけで解放補完する修正、較正不明時はネイティブ解放を待つ。実ログ再現・左右同時押し・再較正など全49テスト、releaseビルド・署名・diff check成功。/Applicationsへ反映してバイナリ一致確認。更新後にOS権限がfalseへ変わったためユーザーへ再登録依頼済み、実機再検証待ちでIN_PROGRESSを維持。他チャットの一時停止アイコン変更は保持。
 - 権限再登録と再起動後、accessibility/listening/posting/monitoringがすべてtrueであることを確認。修正版バイナリ一致を確認し、ユーザーから「音声入力もアイコンも正常」と実機確認を受領。診断引数を外して同じ修正版を通常起動（PID55542）。全49テスト・releaseビルド・署名・diff check成功済み、チェックボックスは未チェックのままIN_REVIEWへ。
+- 再発防止を追加。原因は解放補完ポーリングが論理/物理Optionの一致とHID修飾フラグの不変性を仮定したこと、旧テストがOS読み取り入口を迂回していたこと。KeyboardStateSourceでOS読み取りを差し替え可能にし、公開reconcileHoldState→HoldSession経路で実機フラグ変化・物理左右両対応・3秒保持・解放通知欠落・Shift反転を再現するテストを追加。全50テストとアプリコンパイル・diff check成功。一時コピーにフラグ依存を戻した対照版で追加テストがXCTAssertTrue失敗(exit1)となり検出能力を確認。READMEに原因と入力変更時の実機/インストール/権限確認手順を追加。アプリ再インストール・公開は行わず、並行する配布/署名ドキュメント変更は保持。
 
 ## [DONE] 権限付与されたタイミングで、自動的に再起動したほうが良くないでしょうか？
 - ID: T-60098e14a72646cabd16f5779520e84c
@@ -976,8 +990,10 @@ bump:patch のあと、他のプロジェクトを参考にしてコミットも
 - 右Option押下時に音声入力が始まらずアイコンがバツ（mic.slash）のままになる問題を修正。reconcileHoldStateのポーリングで修飾キーに対してfalseを返しがちなCGEventSource.keyState(61)に依存していたため、長押し判定（180ms）前に即座にリリース処理が呼ばれていた。flagsState(.maskAlternate)と左右修飾ビットを反映した判定に改善。またAppDelegate.holdにおける左Option除外条件を左Option単独押下時のみ除外するよう修正し、動作診断ログとユニットテストを追加。全46テスト通過。
 
 
-## [IN_REVIEW] Puaseしているかどうかがわからない。Pauseしている場合は、斜線ではなく一時停止の二重線にしよう。
+## [DONE] Puaseしているかどうかがわからない。Pauseしている場合は、斜線ではなく一時停止の二重線にしよう。
 - ID: T-70b7fb5dddb548049f515f4b6612e3dd
+- Archived: true
+- CodexArchivedSession: eb8f3ab55d48af58762d76c06b4dc8d5e44726951a7f25e0292f11b82d35bf17
 - CodexSession: eb8f3ab55d48af58762d76c06b4dc8d5e44726951a7f25e0292f11b82d35bf17
 - Created: 2026-11-02
 - Type: Task
@@ -994,4 +1010,22 @@ bump:patch のあと、他のプロジェクトを参考にしてコミットも
 - tckt start により着手。Pause中の表示を斜線から一時停止の二重線に変更し、ビルドで確認する。
 - Pause中はマイク／トランシーバー・全表示モードでメニューバーをpause.fill（二重線）に変更。一時停止表示を権限表示より優先し、Pause中のポップアップを抑止。README更新。Swift scratch build（--disable-sandbox、一時キャッシュ）とgit diff --check成功。インストール済みアプリでの実表示は未確認。
 - 追加指示に対応。一時停止中も選択したトランシーバー／マイク本体を残し、右下に二重線バッジを重ねる描画へ修正。README更新。Swift scratch buildとgit diff --check成功。実アプリ表示は未確認。
+
+## [DONE] Bump コマンドにコミットが含まれることがわかるように末尾に :commitを足してほしい
+- ID: T-315cd46a465a4885b10f70ea7f5d06d2
+- Archived: true
+- CodexArchivedSession: 72426a7a912b08a44f3e897948ee28069f5df7ca1d29591306772f696ba0ebcb
+- CodexPrompt: 0da5eaff95d466d93ad13a45823901b9d63f17023ce04999aaa5f8ab5666a696
+- CodexSession: 72426a7a912b08a44f3e897948ee28069f5df7ca1d29591306772f696ba0ebcb
+- Created: 2026-11-02
+- Source: Codex
+- Type: Task
+
+```text
+Bump コマンドにコミットが含まれることがわかるように末尾に　:commitを足してほしい
+
+```
+
+### Comments
+- Bumpの3コマンドに :commit を追加し、関連ドキュメントとスクリプトの案内も更新。mise tasks ls --local、bash -n、git diff --check で確認済み。実際のバージョン更新・コミットは未実行。
 
