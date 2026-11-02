@@ -1,0 +1,30 @@
+{
+  "version": "2.14",
+  "children": [
+    {
+      "type": "frame",
+      "id": "Hjgmh",
+      "x": 0,
+      "y": 0,
+      "name": "Icon",
+      "clip": true,
+      "width": 512,
+      "height": 512,
+      "fill": "#FFFFFF",
+      "layout": "none",
+      "children": [
+        {
+          "type": "rectangle",
+          "cornerRadius": 64,
+          "id": "iQg7X",
+          "x": 0,
+          "y": 0,
+          "fill": "#CCCCCC",
+          "width": 512,
+          "height": 512
+        }
+      ]
+    }
+  ],
+  "fileToken": "63746aa4-80b1-496e-8621-75eac8b4e2d6"
+}

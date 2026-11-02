@@ -15,17 +15,19 @@ Push2TalkはmacOSアプリなのでFormulaではなくCaskを使います。
 
 ## 準備
 
-XcodeまたはCommand Line Tools、Swift、Git、Ruby、GitHub CLIが必要です。
+XcodeまたはCommand Line Tools、Swift、Git、Ruby、GitHub CLI、Miseが必要です。
 GitHub CLIの既定パスは`/opt/homebrew/bin/gh`です。
 
 ```sh
+mise trust
 /opt/homebrew/bin/gh auth status
-bash scripts/release-homebrew.sh --prepare
+mise run prepare-release
 ```
 
 準備モードは未コミットの変更があっても利用でき、GitHubの変更は行いません。
 テスト、Universalビルド、アプリ署名の検証、ZIP作成、SHA-256計算、Cask生成、
-Ruby構文確認を実行します。`dist/`はGit管理対象外です。
+Ruby構文確認を実行します。既存ZIPからCaskとREADMEだけを再生成する場合は
+`mise run prepare-homebrew OWNER/homebrew-NAME X.Y.Z`を使います。`dist/`はGit管理対象外です。
 
 公開前に`dist/Push2Talk.app`を実機で起動し、音声入力・終了・Enter送信・権限を確認します。
 自動テストではmacOSの音声認識や他アプリへの実入力は確認できません。
@@ -37,26 +39,26 @@ Ruby構文確認を実行します。`dist/`はGit管理対象外です。
 初回は次を実行します。
 
 ```sh
-P2T_CREATE_PUBLIC_REPO=1 bash scripts/release-homebrew.sh
+P2T_CREATE_PUBLIC_REPO=1 mise run release
 ```
 
-スクリプトは公開リポジトリの可視性を確認し、一時ディレクトリにcloneします。
+Miseタスクは公開リポジトリの可視性を確認し、一時ディレクトリにcloneします。
 空の配布リポジトリにはREADMEだけの初期コミットを作り、公開ブランチを用意します。
 その後、GitHub ReleaseにZIPをアップロードし、実際のZIPのSHA-256を含むCaskとREADMEを
 コミット・pushします。ソースコードとそのGit履歴を配布リポジトリにコピーしません。
 公開リポジトリのコミットメッセージは英語のConventional Commit形式です。
 
-次回以降は`packaging/Info.plist`の`CFBundleShortVersionString`を上げてコミットし、実行します。
+次回以降は`mise run bump:patch`、`mise run bump:minor`、`mise run bump:major`でplistのバージョンを上げてコミットし、実行します。
 ビルド時に`CFBundleVersion`も同じ値に設定します。
 
 ```sh
-bash scripts/release-homebrew.sh
+mise run release
 ```
 
 別の配布先は`P2T_PUBLIC_REPO=OWNER/homebrew-NAME`、
 ブランチは`P2T_PUBLIC_BRANCH`で指定できます。
-`P2T_VERSION=X.Y.Z`でビルドバージョンを上書きできますが、通常はplistを更新してください。
-`--skip-checks`はSwiftテストだけを省略し、ビルドと署名検証は必ず実行します。
+バージョンは`packaging/Info.plist`だけで管理します。環境変数による上書きは禁止し、`P2T_VERSION`が設定されている場合はエラーで停止します。
+`mise run prepare-release --skip-checks`または`mise run release --skip-checks`はSwiftテストだけを省略し、ビルドと署名検証は必ず実行します。
 
 同じバージョンで再実行すると、既存のZIPをダウンロードし、そのSHA-256でCaskを生成します。
 既存assetは上書きしません。途中失敗した公開の再開に利用できます。
@@ -76,10 +78,10 @@ Developer ID証明書とnotarytoolのプロファイルがある場合:
 ```sh
 P2T_SIGN_IDENTITY='Developer ID Application: YOUR NAME (TEAMID)' \
 P2T_NOTARY_PROFILE='push2talk-notary' \
-bash scripts/release-homebrew.sh --prepare
+mise run prepare-release
 ```
 
-公開時も同じ環境変数を指定します。スクリプトは署名、公証、staple、ZIP再作成を行います。
+公開時も同じ環境変数を指定します。Miseタスクは署名、公証、staple、ZIP再作成を行います。
 署名方式を変更した配布物には新しいバージョンを使用してください。
 更新後にアクセシビリティ権限が反映されない場合は再登録とアプリ再起動を行います。
 
