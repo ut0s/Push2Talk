@@ -39,8 +39,26 @@ enum SettingsPage: String, CaseIterable {
 }
 
 final class Settings {
+  static let releaseDelays = [0.3, 0.5, 0.8, 1.2, 2.0, 3.0]
   static let settleDelays = [0.3, 0.5, 0.8, 1.2, 2.0, 3.0]
   private let defaults = UserDefaults.standard
+  var speechEngine: SpeechEngine {
+    get { SpeechEngine(rawValue: defaults.string(forKey: "speechEngine") ?? "") ?? .system }
+    set { defaults.set(newValue.rawValue, forKey: "speechEngine") }
+  }
+  var whisperModel: SpeechModel {
+    get { defaults.string(forKey: "whisperModel") == SpeechModel.small.rawValue ? .small : .base }
+    set { defaults.set(newValue.rawValue, forKey: "whisperModel") }
+  }
+  var qwenModel: SpeechModel {
+    get {
+      guard let value = defaults.string(forKey: "qwenModel"),
+        let model = SpeechModel(rawValue: value), model.engine == .qwen
+      else { return .qwen06 }
+      return model
+    }
+    set { defaults.set(newValue.rawValue, forKey: "qwenModel") }
+  }
   var settingsPage: SettingsPage {
     get { SettingsPage(rawValue: defaults.string(forKey: "settingsPage") ?? "") ?? .dictation }
     set { defaults.set(newValue.rawValue, forKey: "settingsPage") }
@@ -67,6 +85,13 @@ final class Settings {
   var sendEnter: Bool {
     get { defaults.object(forKey: "sendEnter") as? Bool ?? false }
     set { defaults.set(newValue, forKey: "sendEnter") }
+  }
+  var releaseDelay: Double {
+    get {
+      let value = defaults.object(forKey: "releaseDelay") as? Double ?? 0.8
+      return value.isFinite ? min(3, max(0.3, value)) : 0.8
+    }
+    set { defaults.set(newValue, forKey: "releaseDelay") }
   }
   var settleDelay: Double {
     get {

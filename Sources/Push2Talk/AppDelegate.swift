@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import AVFoundation
 import Push2TalkCore
 import Push2TalkInput
 import ServiceManagement
@@ -9,6 +10,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   private let statusPopup = StatusPopup()
   private let keyboard = KeyboardBridge()
   private var session = HoldSession()
+  private var localSpeech: LocalSpeech?
+  private var modelOperations: Set<SpeechModel> = []
+  private var modelStatus: [SpeechModel: String] = [:]
+  private var modelButtons: [SpeechModel: NSButton] = [:]
+  private var modelLabels: [SpeechModel: NSTextField] = [:]
+  private var speechRuntimeStatus: NSTextField?
+  private var systemShortcutSection: NSView?
+  private var microphoneButton: NSButton?
+  private var microphoneRequestPending = false
+  private var localError: String?
   private var target: FocusTarget?
   private var timer: Timer?
   private var permissionsTimer: Timer?
@@ -35,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     statusItem.button?.image = settings.menuBarIcon.image(symbol: "mic.slash", description: "Push2Talk")
     updates.onCheckFinished = { [weak self] in self?.rebuildMenu() }
+    if !settings.speechEngine.supported { settings.speechEngine = .system }
     rebuildMenu()
 
     keyboard.onHold = { [weak self] down, shiftHeld in self?.hold(down, shiftHeld: shiftHeld) }
@@ -73,6 +85,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       self.cancel()
       self.settings.sendEnter.toggle()
     }
+    addChoices("キーを離してから終了まで", values: Settings.releaseDelays, selected: settings.releaseDelay,
+      title: { L10n.format("%@秒", String($0)) }, to: quick) { [weak self] in self?.settings.releaseDelay = $0 }
     addChoices("文字確定の待ち時間", values: Settings.settleDelays, selected: settings.settleDelay,
       title: { L10n.format("%@秒", String($0)) }, to: quick) { [weak self] in self?.settings.settleDelay = $0 }
     addChoices("開始ショートカット", values: DictationTrigger.allCases, selected: settings.trigger,
@@ -99,6 +113,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let updateItem = menu.addItem(withTitle: updates.checking ? L10n.text("アップデートを確認中…") : L10n.text("アップデートを確認…"), action: updates.checking ? nil : #selector(checkForUpdates), keyEquivalent: "")
     updateItem.isEnabled = !updates.checking
     menu.addItem(.separator())
+    menu.addItem(withTitle: L10n.text("Push2Talkを再起動"), action: #selector(restart), keyEquivalent: "")
     menu.addItem(withTitle: L10n.text("Push2Talkを終了"), action: #selector(quit), keyEquivalent: "q")
     for item in menu.items where item.action != nil { item.target = self }
     statusItem.menu = menu
@@ -139,7 +154,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func select(_ key: String, _ index: Int?) {
       (settingsControls[key] as? NSPopUpButton)?.selectItem(at: index ?? 0)
     }
+    select("engine", SpeechEngine.allCases.firstIndex(of: settings.speechEngine))
+    select("whisperModel", settings.whisperModel == .small ? 1 : 0)
     select("trigger", DictationTrigger.allCases.firstIndex(of: settings.trigger))
+    select("releaseDelay", Settings.releaseDelays.firstIndex(of: settings.releaseDelay))
     select("delay", Settings.settleDelays.firstIndex(of: settings.settleDelay))
     select("displayModePicker", StatusDisplayMode.allCases.firstIndex(of: settings.statusDisplayMode))
     select("iconPicker", MenuBarIcon.allCases.firstIndex(of: settings.menuBarIcon))
@@ -172,6 +190,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     restartNotice?.orderOut(nil)
     cancel()
     statusPopup.update(nil)
+    keyboard.restorePasteboard()
     keyboard.stop()
     timer?.invalidate()
     permissionsTimer?.invalidate()
@@ -198,6 +217,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     // used to authorize a new session. The tick still guards event posting.
     if !down {
       session.release(at: now, shiftHeld: shiftHeld)
+      if session.phase == .idle {
+        cancelLocalSpeech()
+        target = nil
+      }
       return
     }
     guard !isRestarting, !paused else { reportOperation(L10n.text("開始できません: 一時停止中です")); return }
@@ -211,6 +234,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       reportOperation(L10n.text("開始できません: アクセシビリティとキー送信の権限を確認してください")); return
     }
     guard session.phase == .idle else { return }
+    localError = nil
     let flags = CGEventSource.flagsState(.hidSystemState)
     let leftOptionOnly = (flags.rawValue & 0x60) == 0x20
     guard flags.intersection([.maskControl, .maskCommand, .maskSecondaryFn]).isEmpty,
@@ -219,7 +243,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     guard let focus = FocusTarget.capture() else {
       reportOperation(L10n.text("開始しません: 別アプリの入力欄を選んでください（パスワード欄は対象外です）")); return
     }
+    let engine = settings.speechEngine
+    if engine != .system {
+      guard focus.isEditable else {
+        showLocalError("書き込み可能な入力欄を選んでください")
+        return
+      }
+      let model = engine == .whisper ? settings.whisperModel : settings.qwenModel
+      guard engine.supported, let executable = model.executable, model.installed,
+        !modelOperations.contains(model)
+      else {
+        showLocalError("音声入力の設定でランタイムとモデルを確認してください")
+        return
+      }
+      guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else {
+        showLocalError("音声入力の設定でマイクを許可してください")
+        return
+      }
+      do {
+        localSpeech = try LocalSpeech(model: model, executable: executable)
+      } catch {
+        showLocalError("録音を開始できませんでした")
+        return
+      }
+    }
     target = focus
+    session.waitsForRecognition = localSpeech != nil
+    session.startupGrace = localSpeech == nil ? 0.65 : 0
+    session.releaseDelay = settings.releaseDelay
     session.settleDelay = settings.settleDelay
     session.sendEnter = settings.sendEnter
     session.press(at: now)
@@ -244,9 +295,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       guard let focus = target else { break }
       switch action {
       case .start:
-        reportOperation(L10n.text("音声入力の開始ショートカットを送信します"))
-        keyboard.startDictation(settings.trigger, ifCurrent: { focus.isCurrent })
-      case .stop: keyboard.stopDictation(ifCurrent: { focus.isCurrent })
+        if let localSpeech {
+          do {
+            try localSpeech.start()
+            reportOperation(L10n.text("ローカル録音を開始しました"))
+          } catch {
+            cancel()
+            showLocalError("録音を開始できませんでした")
+          }
+        } else {
+          reportOperation(L10n.text("音声入力の開始ショートカットを送信します"))
+          keyboard.startDictation(settings.trigger, ifCurrent: { focus.isCurrent })
+        }
+      case .stop:
+        if let localSpeech {
+          if session.phase == .recognizing {
+            finishLocalSpeech(localSpeech, in: focus)
+          } else {
+            cancelLocalSpeech()
+          }
+        } else {
+          keyboard.stopDictation(ifCurrent: { focus.isCurrent })
+        }
       case .enter:
         let flags = CGEventSource.flagsState(.hidSystemState)
         if focus.canSubmitAutomatically, target?.isCurrent == true, target?.hasNewText == true,
@@ -258,7 +328,55 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
       }
     }
-    if session.phase == .idle { target = nil }
+    if session.phase == .idle {
+      cancelLocalSpeech()
+      target = nil
+    }
+    updateStatus()
+  }
+
+  private func finishLocalSpeech(_ speech: LocalSpeech, in focus: FocusTarget) {
+    do {
+      try speech.transcribe { [weak self, weak speech] result in
+        guard let self, let speech, self.localSpeech === speech, self.session.phase == .recognizing else { return }
+        guard !self.keyboard.secureInputEnabled, AXIsProcessTrusted(),
+          CGPreflightPostEventAccess(), focus.isCurrent
+        else {
+          self.cancel()
+          return
+        }
+        switch result {
+        case .success(let text) where !text.isEmpty:
+          if focus.insertText(text, using: self.keyboard) {
+            self.session.finishRecognition(at: self.now)
+            self.reportOperation(L10n.text("文字起こし結果を入力欄に渡しました"))
+          } else {
+            self.cancel()
+            self.showLocalError("入力欄に認識結果を書き込めませんでした")
+          }
+        case .success:
+          self.cancel()
+          self.showLocalError("音声を認識できませんでした")
+        case .failure:
+          self.cancel()
+          self.showLocalError("ローカル文字起こしに失敗しました")
+        }
+      }
+      reportOperation(L10n.text("録音を終了し、ローカル文字起こしを開始しました"))
+    } catch {
+      cancel()
+      showLocalError("ローカル文字起こしに失敗しました")
+    }
+  }
+
+  private func cancelLocalSpeech() {
+    localSpeech?.cancel()
+    localSpeech = nil
+  }
+
+  private func showLocalError(_ message: String) {
+    localError = L10n.text(message)
+    reportOperation(L10n.text(message))
     updateStatus()
   }
 
@@ -276,7 +394,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let actions = session.cancel()
     reportOperation(L10n.text("操作を中断しました。入力先の変更・クリック・ほかのキー入力を確認してください"))
     // Never send Escape into a different app/control; focus changes already end native Dictation.
-    if !nativeEscape, actions.contains(.stop), let focus = target, focus.isCurrent,
+    if localSpeech != nil {
+      cancelLocalSpeech()
+    } else if !nativeEscape, actions.contains(.stop), let focus = target, focus.isCurrent,
       AXIsProcessTrusted()
     {
       keyboard.stopDictation(ifCurrent: { focus.isCurrent })
@@ -303,6 +423,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       lastPermissionStatus = permissionStatus
     }
     updateStatus()
+    refreshModelControls()
     permissionStatusView?.refresh(
       accessibilityGranted: accessibilityGranted,
       listeningGranted: listeningGranted, postingGranted: postingGranted,
@@ -371,7 +492,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     } else {
       switch session.phase {
       case .idle:
-        title = L10n.text("右Optionを長押しして話す")
+        title = localError ?? L10n.text("右Optionを長押しして話す")
         symbol = "mic"
       case .arming:
         title = L10n.text("長押しを確認中…")
@@ -379,7 +500,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       case .recording, .stopping:
         title = L10n.text("音声入力中 — 離すと終了")
         symbol = "mic.fill"
-      case .settling:
+      case .recognizing, .settling:
         title = L10n.text("文字の確定を待っています…")
         symbol = "ellipsis.bubble"
       }
@@ -395,16 +516,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       attributes: [.foregroundColor: NSColor.systemRed])
     statusItem.button?.toolTip = "Push2Talk: \(title)"
     let popupState: StatusPopup.State?
+    var recordingLevel: CGFloat?
     if !paused && settings.statusDisplayMode.showsPopup && symbol != "mic.slash" {
       switch session.phase {
-      case .recording, .stopping: popupState = .recording
-      case .settling: popupState = .settling
+      case .recording, .stopping:
+        recordingLevel = localSpeech?.recordingLevel()
+        if localSpeech == nil {
+          popupState = .recording
+        } else {
+          popupState = recordingLevel == nil ? nil : .waveform
+        }
+      case .recognizing, .settling: popupState = .settling
       default: popupState = nil
       }
     } else {
       popupState = nil
     }
-    statusPopup.update(popupState)
+    statusPopup.update(popupState, recordingLevel: recordingLevel)
   }
 
   @objc private func togglePause() {
@@ -436,6 +564,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     window.contentView = layout
 
     let input = layout.category(L10n.text("音声入力"), subtitle: L10n.text("右Optionを長押し → 話す → 離して終了"), page: .dictation)
+    addSpeechEngineSettings(to: input, layout: layout)
     let shortcut = layout.section(L10n.text("音声入力の準備"), in: input)
     layout.note(L10n.text("macOSの音声入力をオンにし、OSとPush2Talkで同じショートカットを選んでください。"), in: shortcut)
     let trigger = NSPopUpButton()
@@ -446,9 +575,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     trigger.action = #selector(changeTrigger(_:))
     layout.row(L10n.text("開始ショートカット"), control: trigger, in: shortcut)
     shortcut.addArrangedSubview(NSButton(title: L10n.text("macOSのキーボード設定を開く"), target: self, action: #selector(openKeyboard)))
-    shortcut.addArrangedSubview(NSButton(title: L10n.text("初期設定を完了・権限を再確認"), target: self, action: #selector(completeSetup)))
+    systemShortcutSection = shortcut.superview
+    systemShortcutSection?.isHidden = settings.speechEngine != .system
+    input.addArrangedSubview(NSButton(title: L10n.text("初期設定を完了・権限を再確認"), target: self, action: #selector(completeSetup)))
 
     let behavior = layout.section(L10n.text("入力終了後の動作"), in: input)
+    let releaseDelay = NSPopUpButton()
+    settingsControls["releaseDelay"] = releaseDelay
+    for value in Settings.releaseDelays {
+      releaseDelay.addItem(withTitle: L10n.format("%@秒", String(value)))
+      releaseDelay.lastItem?.representedObject = value
+    }
+    releaseDelay.selectItem(at: Settings.releaseDelays.firstIndex(of: settings.releaseDelay) ?? 2)
+    releaseDelay.target = self
+    releaseDelay.action = #selector(changeReleaseDelay(_:))
+    layout.row(L10n.text("キーを離してから終了まで"), control: releaseDelay, in: behavior)
+    layout.note(L10n.text("語尾が欠けないよう、キーを離した後も少し音声入力を続けます。変換が間に合わない場合は、この時間を延ばしてください。"), in: behavior)
     let enter = NSButton(checkboxWithTitle: L10n.text("終了後にEnterを送る"), target: self, action: #selector(changeEnter(_:)))
     settingsControls["enter"] = enter
     enter.state = settings.sendEnter ? .on : .off
@@ -507,7 +649,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       revealAppAction: #selector(revealCurrentApp))
     permissionStatusView = permissions
     layout.fullWidth(permissions, in: permissionsPage)
-    layout.note(L10n.text("マイク・音声認識の許可はmacOS標準音声入力が管理します。Push2Talk自体には不要です。"), in: permissionsPage)
+    layout.note(L10n.text("ローカルエンジンを使う場合は、音声入力タブで Push2Talk のマイク利用を許可してください。"), in: permissionsPage)
 
     let general = layout.category(L10n.text("一般"), subtitle: L10n.text("起動とアプリの管理"), page: .general)
     let languageSection = layout.section(L10n.text("言語"), in: general)
@@ -518,7 +660,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     languagePicker.target = self
     languagePicker.action = #selector(changeLanguage(_:))
     layout.row(L10n.text("表示言語"), control: languagePicker, in: languageSection)
-    layout.note(L10n.text("言語を変更すると表示をすぐに更新します。音声入力の認識言語はmacOSで設定してください。"), in: languageSection)
+    layout.note(L10n.text("言語を変更すると表示をすぐに更新します。認識言語は音声入力のエンジン設定に従います。"), in: languageSection)
     let startup = layout.section(L10n.text("起動"), in: general)
     let login = NSButton(checkboxWithTitle: L10n.text("ログイン時に起動"), target: self, action: #selector(changeLogin(_:)))
     settingsControls["login"] = login
@@ -537,6 +679,203 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     NSApp.activate(ignoringOtherApps: true)
   }
 
+  private func addSpeechEngineSettings(to page: NSStackView, layout: SettingsLayout) {
+    let section = layout.section(L10n.text("認識エンジン"), in: page)
+    let picker = NSPopUpButton()
+    settingsControls["engine"] = picker
+    picker.autoenablesItems = false
+    for engine in SpeechEngine.allCases {
+      picker.addItem(withTitle: engine.title)
+      picker.lastItem?.isEnabled = engine.supported
+    }
+    picker.selectItem(at: SpeechEngine.allCases.firstIndex(of: settings.speechEngine) ?? 0)
+    picker.target = self
+    picker.action = #selector(changeSpeechEngine(_:))
+    layout.row(L10n.text("認識エンジン"), control: picker, in: section)
+
+    let status = NSTextField(wrappingLabelWithString: "")
+    status.textColor = .secondaryLabelColor
+    layout.fullWidth(status, in: section)
+    speechRuntimeStatus = status
+
+    let microphone = NSButton(title: L10n.text("マイクを許可"), target: self, action: #selector(requestMicrophone))
+    section.addArrangedSubview(microphone)
+    microphoneButton = microphone
+
+    let modelPicker = NSPopUpButton()
+    settingsControls["whisperModel"] = modelPicker
+    modelPicker.addItems(withTitles: ["base", "small"])
+    modelPicker.selectItem(at: settings.whisperModel == .small ? 1 : 0)
+    modelPicker.target = self
+    modelPicker.action = #selector(changeWhisperModel(_:))
+    layout.row(L10n.text("Whisper モデル"), control: modelPicker, in: section)
+
+    let qwenPicker = NSPopUpButton()
+    settingsControls["qwenModel"] = qwenPicker
+    for (model, title): (SpeechModel, String) in [
+      (.qwen06, "0.6B (MLX)"), (.qwen17MLX, "1.7B (MLX, 4-bit)"), (.qwen17HF, "1.7B-hf (Transformers)"),
+    ] {
+      qwenPicker.addItem(withTitle: title)
+      qwenPicker.lastItem?.representedObject = model.rawValue
+    }
+    qwenPicker.selectItem(at: qwenPicker.indexOfItem(withRepresentedObject: settings.qwenModel.rawValue))
+    qwenPicker.target = self
+    qwenPicker.action = #selector(changeQwenModel(_:))
+    layout.row(L10n.text("Qwen3-ASR モデル"), control: qwenPicker, in: section)
+
+    let models = layout.section(L10n.text("モデルデータ"), in: page)
+    for model in SpeechModel.allCases {
+      let label = NSTextField(labelWithString: model.title)
+      label.setContentHuggingPriority(.defaultLow, for: .horizontal)
+      modelLabels[model] = label
+      let button = NSButton(title: "", target: self, action: #selector(manageSpeechModel(_:)))
+      button.identifier = NSUserInterfaceItemIdentifier(model.rawValue)
+      button.setContentCompressionResistancePriority(.required, for: .horizontal)
+      modelButtons[model] = button
+      let row = NSStackView(views: [label, button])
+      row.alignment = .centerY
+      row.spacing = 16
+      layout.fullWidth(row, in: models)
+    }
+    refreshModelControls()
+  }
+
+  private func refreshModelControls() {
+    guard let speechRuntimeStatus else { return }
+    let engine = settings.speechEngine
+    systemShortcutSection?.isHidden = engine != .system
+    settingsControls["whisperModel"]?.isEnabled = engine == .whisper
+    settingsControls["qwenModel"]?.isEnabled = engine == .qwen
+    switch engine {
+    case .system:
+      speechRuntimeStatus.stringValue = SpeechEngine.whisper.supported
+        ? L10n.text("macOS の音声入力設定を使用します。")
+        : L10n.text("ローカルエンジンは Apple Silicon と macOS 14 以降が必要です。")
+    case .whisper:
+      speechRuntimeStatus.stringValue = engine.executable == nil
+        ? L10n.text("必要なランタイム: uv tool install --python 3.12 mlx-whisper==0.4.3 / brew install ffmpeg")
+        : L10n.text("ローカルで文字起こしします。認識言語は発話ごとに自動判定します。")
+    case .qwen:
+      let runtime = settings.qwenModel == .qwen17HF
+        ? "必要なランタイム: uv tool install --python 3.12 --with torch transformers==5.23.0"
+        : "必要なランタイム: uv tool install --python 3.12 mlx-qwen3-asr==0.4.4"
+      speechRuntimeStatus.stringValue = settings.qwenModel.executable == nil
+        ? L10n.text(runtime)
+        : L10n.text("ローカルで文字起こしします。認識言語は発話ごとに自動判定します。")
+    }
+    let microphoneStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+    microphoneButton?.isHidden = engine == .system || microphoneStatus == .authorized
+    microphoneButton?.isEnabled = !microphoneRequestPending
+    microphoneButton?.title = microphoneStatus == .notDetermined
+      ? L10n.text("マイクを許可") : L10n.text("マイクのシステム設定を開く")
+
+    for model in SpeechModel.allCases {
+      let working = modelOperations.contains(model)
+      let exists = FileManager.default.fileExists(atPath: model.directory.path)
+      let status = modelStatus[model] ?? (model.installed ? L10n.text("ダウンロード済み") : L10n.text("未ダウンロード"))
+      modelLabels[model]?.stringValue = "\(model.title) — \(status)"
+      let button = modelButtons[model]
+      button?.title = exists ? L10n.text("削除…") : L10n.text("ダウンロード")
+      button?.isEnabled = !working && (exists || model.engine.supported)
+    }
+  }
+
+  @objc private func changeSpeechEngine(_ sender: NSPopUpButton) {
+    guard SpeechEngine.allCases.indices.contains(sender.indexOfSelectedItem) else { return }
+    let engine = SpeechEngine.allCases[sender.indexOfSelectedItem]
+    guard engine.supported else { return }
+    cancel()
+    localError = nil
+    settings.speechEngine = engine
+    refreshModelControls()
+    updateStatus()
+  }
+
+  @objc private func changeWhisperModel(_ sender: NSPopUpButton) {
+    cancel()
+    localError = nil
+    settings.whisperModel = sender.indexOfSelectedItem == 1 ? .small : .base
+    updateStatus()
+  }
+
+  @objc private func changeQwenModel(_ sender: NSPopUpButton) {
+    guard let value = sender.selectedItem?.representedObject as? String,
+      let model = SpeechModel(rawValue: value), model.engine == .qwen
+    else { return }
+    cancel()
+    localError = nil
+    settings.qwenModel = model
+    refreshModelControls()
+    updateStatus()
+  }
+
+  @objc private func requestMicrophone() {
+    guard !microphoneRequestPending else { return }
+    if AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
+      microphoneRequestPending = true
+      refreshModelControls()
+      AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
+        DispatchQueue.main.async {
+          self?.microphoneRequestPending = false
+          if granted { self?.localError = nil }
+          self?.refreshModelControls()
+          self?.updateStatus()
+        }
+      }
+    } else if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+      NSWorkspace.shared.open(url)
+    }
+  }
+
+  @objc private func manageSpeechModel(_ sender: NSButton) {
+    guard let identifier = sender.identifier?.rawValue, let model = SpeechModel(rawValue: identifier),
+      !modelOperations.contains(model)
+    else { return }
+    if FileManager.default.fileExists(atPath: model.directory.path) {
+      guard let settingsWindow else { return }
+      modelOperations.insert(model)
+      refreshModelControls()
+      let confirmation = NSAlert()
+      confirmation.messageText = L10n.format("%@ を削除しますか？", model.title)
+      confirmation.informativeText = L10n.text("モデルは後からダウンロードできます。")
+      confirmation.addButton(withTitle: L10n.text("キャンセル"))
+      confirmation.addButton(withTitle: L10n.text("削除"))
+      confirmation.beginSheetModal(for: settingsWindow) { [weak self] response in
+        guard let self else { return }
+        defer {
+          self.modelOperations.remove(model)
+          self.refreshModelControls()
+        }
+        guard response == .alertSecondButtonReturn else { return }
+        self.cancel()
+        do {
+          try FileManager.default.removeItem(at: model.directory)
+          self.modelStatus[model] = nil
+          self.localError = nil
+          self.updateStatus()
+        } catch {
+          self.modelStatus[model] = L10n.text("削除に失敗しました")
+        }
+      }
+    } else if model.engine.supported {
+      modelOperations.insert(model)
+      modelStatus[model] = L10n.text("ダウンロード中…")
+      refreshModelControls()
+      Task { @MainActor [weak self] in
+        do {
+          try await SpeechModelStore.download(model)
+          self?.modelStatus[model] = nil
+          self?.localError = nil
+          self?.updateStatus()
+        } catch {
+          self?.modelStatus[model] = L10n.text("ダウンロードに失敗しました")
+        }
+        self?.modelOperations.remove(model)
+        self?.refreshModelControls()
+      }
+    }
+  }
+
   @objc private func changeLanguage(_ sender: NSPopUpButton) {
     cancel()
     setLanguage(AppLanguage.allCases[sender.indexOfSelectedItem])
@@ -547,6 +886,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     // Do not retain a closed settings window or any of its controls.
     settingsWindow = nil
     settingsControls.removeAll()
+    modelButtons.removeAll()
+    modelLabels.removeAll()
+    speechRuntimeStatus = nil
+    systemShortcutSection = nil
+    microphoneButton = nil
     permissionStatusView = nil
     // Relinquish activation so macOS returns focus to the previous application.
     NSApp.hide(nil)
@@ -584,6 +928,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   }
   @objc private func changeRecordingText(_ sender: NSPopUpButton) {
     settings.recordingText = RecordingText.allCases[sender.indexOfSelectedItem]
+    rebuildMenu()
+  }
+  @objc private func changeReleaseDelay(_ sender: NSPopUpButton) {
+    settings.releaseDelay = sender.selectedItem?.representedObject as? Double ?? 0.8
     rebuildMenu()
   }
   @objc private func changeDelay(_ sender: NSPopUpButton) {
@@ -625,6 +973,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
   }
   @objc private func recheckPermissions() {
+    relaunch(showSettings: true, failureMessage: L10n.text("権限を再確認できませんでした"))
+  }
+
+  @objc private func restart() {
+    relaunch(showSettings: false, failureMessage: L10n.text("Push2Talkを再起動できませんでした"))
+  }
+
+  private func relaunch(showSettings: Bool, failureMessage: String) {
     guard !isRestarting else { return }
     isRestarting = true
     restartNotice?.orderOut(nil)
@@ -636,9 +992,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     relaunch.executableURL = URL(fileURLWithPath: "/bin/sh")
     relaunch.arguments = [
       "-c",
-      "while kill -0 \"$1\" 2>/dev/null; do sleep 0.1; done; app=\"$2\"; shift 2; /usr/bin/open -n \"$app\" --args --settings \"$@\"",
+      "while kill -0 \"$1\" 2>/dev/null; do sleep 0.1; done; app=\"$2\"; shift 2; /usr/bin/open -n \"$app\" --args \"$@\"",
       "Push2Talk-relaunch", String(ProcessInfo.processInfo.processIdentifier), Bundle.main.bundlePath,
-    ] + (paused ? ["--paused"] : [])
+    ] + (showSettings ? ["--settings"] : []) + (paused ? ["--paused"] : [])
     do {
       try relaunch.run()
       NSApp.terminate(nil)
@@ -646,7 +1002,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       isRestarting = false
       checkPermissions()
       let alert = NSAlert()
-      alert.messageText = L10n.text("権限を再確認できませんでした")
+      alert.messageText = failureMessage
       alert.informativeText = error.localizedDescription
       alert.runModal()
     }
