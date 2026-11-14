@@ -86,9 +86,9 @@ cp "$binary_dir/Push2Talk" "$app/Contents/MacOS/Push2Talk"
 
 identity="${P2T_SIGN_IDENTITY:--}"
 if [[ "$identity" == '-' ]]; then
-  codesign --force --sign - "$app"
+  codesign --force --entitlements packaging/Push2Talk.entitlements --sign - "$app"
 else
-  codesign --force --options runtime --timestamp --sign "$identity" "$app"
+  codesign --force --options runtime --timestamp --entitlements packaging/Push2Talk.entitlements --sign "$identity" "$app"
 fi
 codesign --verify --strict "$app"
 archive="$PWD/dist/Push2Talk-$version.zip"

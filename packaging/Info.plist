@@ -29,6 +29,8 @@
 	<string>13.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Push2Talk records your voice for on-device transcription when a local engine is selected.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 </dict>
