@@ -8,14 +8,17 @@ public struct HoldSession {
     case arming(Double)
     case recording(Double)
     case stopping(Double)
+    case recognizing
     case settling(Double)
   }
   public private(set) var phase: Phase = .idle
   public var holdDelay = 0.18
   public var startupGrace = 0.65
+  public var releaseDelay = 0.8
   public var settleDelay = 0.8
   public var maximumDuration = 60.0
   public var sendEnter = false
+  public var waitsForRecognition = false
   private var submitOnFinish = false
 
   public init() {}
@@ -31,7 +34,8 @@ public struct HoldSession {
     case .recording(let started):
       // Snapshot the choice at release; later Shift changes must not alter it.
       submitOnFinish = sendEnter != shiftHeld
-      phase = .stopping(max(now, started + startupGrace))
+      // Keep Dictation listening briefly so trailing speech can be recognized.
+      phase = .stopping(max(now + releaseDelay, started + startupGrace))
     default: break
     }
   }
@@ -44,13 +48,18 @@ public struct HoldSession {
     case .recording(let started) where now - started >= maximumDuration:
       return cancel()
     case .stopping(let deadline) where now >= deadline:
-      phase = .settling(now + settleDelay)
+      phase = waitsForRecognition ? .recognizing : .settling(now + settleDelay)
       return [.stop]
     case .settling(let deadline) where now >= deadline:
       phase = .idle
       return submitOnFinish ? [.enter] : []
     default: return []
     }
+  }
+
+  public mutating func finishRecognition(at now: Double) {
+    guard phase == .recognizing else { return }
+    phase = .settling(now + settleDelay)
   }
 
   public mutating func cancel() -> [Action] {

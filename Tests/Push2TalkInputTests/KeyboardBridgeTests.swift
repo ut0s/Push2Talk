@@ -47,8 +47,9 @@ final class KeyboardBridgeTests: XCTestCase {
       await fulfillment(of: [released], timeout: 1)
       XCTAssertEqual(transitions, [true, false])
       XCTAssertFalse(bridge.isRightOptionHeld)
-      XCTAssertEqual(session.tick(at: 3.25), [.stop])
-      XCTAssertEqual(session.tick(at: 4.25), [.enter])
+      XCTAssertEqual(session.tick(at: 3.25), [])
+      XCTAssertEqual(session.tick(at: 4.06), [.stop])
+      XCTAssertEqual(session.tick(at: 4.87), [.enter])
       bridge.stop()
     }
   }
@@ -81,8 +82,9 @@ final class KeyboardBridgeTests: XCTestCase {
     XCTAssertFalse(bridge.isRightOptionHeld)
     await fulfillment(of: [released], timeout: 1)
     XCTAssertEqual(transitions, [true, false])
-    XCTAssertEqual(session.tick(at: 1), [.stop])
-    XCTAssertEqual(session.tick(at: 2), [.enter])
+    XCTAssertEqual(session.tick(at: 1), [])
+    XCTAssertEqual(session.tick(at: 1.81), [.stop])
+    XCTAssertEqual(session.tick(at: 2.62), [.enter])
     // A delayed native release must not deliver another transition.
     _ = bridge.handle(.flagsChanged, event(key: 61))
     let drained = expectation(description: "Late release processed")

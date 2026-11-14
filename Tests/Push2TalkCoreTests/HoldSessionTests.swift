@@ -3,9 +3,74 @@ import XCTest
 @testable import Push2TalkCore
 
 final class HoldSessionTests: XCTestCase {
+  func testLocalRecognitionWaitsForResultBeforeSendingEnter() {
+    var session = HoldSession()
+    session.waitsForRecognition = true
+    session.press(at: 0)
+    XCTAssertEqual(session.tick(at: 0.2), [.start])
+    session.release(at: 1, shiftHeld: true)
+    XCTAssertEqual(session.tick(at: 2), [.stop])
+    XCTAssertEqual(session.phase, .recognizing)
+    XCTAssertEqual(session.tick(at: 10), [])
+    session.finishRecognition(at: 10)
+    XCTAssertEqual(session.tick(at: 10.7), [])
+    XCTAssertEqual(session.tick(at: 11), [.enter])
+  }
+
+  func testCancelledLocalRecognitionCannotResumeSubmission() {
+    var session = HoldSession()
+    session.waitsForRecognition = true
+    session.sendEnter = true
+    session.press(at: 0)
+    XCTAssertEqual(session.tick(at: 0.2), [.start])
+    session.release(at: 1)
+    XCTAssertEqual(session.tick(at: 2), [.stop])
+    _ = session.cancel()
+    session.finishRecognition(at: 3)
+    XCTAssertEqual(session.tick(at: 4), [])
+    XCTAssertEqual(session.phase, .idle)
+  }
+
+  func testReleaseKeepsDictationRunningBeforeStopThenWaitsBeforeEnter() {
+    var session = HoldSession()
+    session.sendEnter = true
+    session.press(at: 0)
+    XCTAssertEqual(session.tick(at: 0.2), [.start])
+    session.release(at: 2)
+    session.release(at: 2.4)
+    XCTAssertEqual(session.tick(at: 2), [])
+    XCTAssertEqual(session.tick(at: 2.79), [])
+    XCTAssertEqual(session.tick(at: 2.81), [.stop])
+    XCTAssertEqual(session.tick(at: 3.5), [])
+    XCTAssertEqual(session.tick(at: 3.62), [.enter])
+    XCTAssertEqual(session.tick(at: 4), [])
+  }
+
+  func testLongerReleaseDelayAndCancellationDuringGrace() {
+    var session = HoldSession()
+    session.releaseDelay = 2
+    session.press(at: 0)
+    XCTAssertEqual(session.tick(at: 0.2), [.start])
+    session.release(at: 1, shiftHeld: true)
+    XCTAssertEqual(session.tick(at: 2.9), [])
+    XCTAssertEqual(session.cancel(), [.stop])
+    XCTAssertEqual(session.tick(at: 4), [])
+    XCTAssertEqual(session.phase, .idle)
+  }
+
+  func testQuickReleaseAlsoGetsReleaseGrace() {
+    var session = HoldSession()
+    session.press(at: 0)
+    XCTAssertEqual(session.tick(at: 0.2), [.start])
+    session.release(at: 0.21)
+    XCTAssertEqual(session.tick(at: 0.86), [])
+    XCTAssertEqual(session.tick(at: 1.02), [.stop])
+  }
+
   func testShiftAtReleaseInvertsDefaultForOneSessionOnly() {
     for defaultEnter in [false, true] {
       var session = HoldSession()
+      session.releaseDelay = 0
       session.sendEnter = defaultEnter
       session.press(at: 0)
       XCTAssertEqual(session.tick(at: 0.2), [.start])
@@ -27,6 +92,7 @@ final class HoldSessionTests: XCTestCase {
 
   func testShiftDoesNotSubmitAfterTapCancellationOrTimeout() {
     var session = HoldSession()
+    session.releaseDelay = 0
     session.press(at: 0)
     session.release(at: 0.1, shiftHeld: true)
     XCTAssertEqual(session.tick(at: 1), [])
@@ -47,6 +113,7 @@ final class HoldSessionTests: XCTestCase {
 
   func testHoldStartsStopsAndSubmitsOnce() {
     var session = HoldSession()
+    session.releaseDelay = 0
     session.sendEnter = true
     session.press(at: 0)
     XCTAssertEqual(session.tick(at: 0.1), [])
@@ -61,6 +128,7 @@ final class HoldSessionTests: XCTestCase {
 
   func testTapDoesNothing() {
     var session = HoldSession()
+    session.releaseDelay = 0
     session.press(at: 0)
     session.release(at: 0.1)
     XCTAssertEqual(session.tick(at: 1), [])
@@ -69,6 +137,7 @@ final class HoldSessionTests: XCTestCase {
 
   func testQuickReleaseAfterStartWaitsForStartup() {
     var session = HoldSession()
+    session.releaseDelay = 0
     session.press(at: 0)
     XCTAssertEqual(session.tick(at: 0.2), [.start])
     session.release(at: 0.21)
@@ -78,6 +147,7 @@ final class HoldSessionTests: XCTestCase {
 
   func testCancelDuringHoldStopsWithoutEnter() {
     var session = HoldSession()
+    session.releaseDelay = 0
     session.sendEnter = true
     session.press(at: 0)
     _ = session.tick(at: 0.2)
@@ -88,6 +158,7 @@ final class HoldSessionTests: XCTestCase {
 
   func testFocusChangeDuringSettleCancelsEnter() {
     var session = HoldSession()
+    session.releaseDelay = 0
     session.sendEnter = true
     session.press(at: 0)
     _ = session.tick(at: 0.2)
@@ -99,6 +170,7 @@ final class HoldSessionTests: XCTestCase {
 
   func testCancelDuringArmingDoesNotStopNativeDictation() {
     var session = HoldSession()
+    session.releaseDelay = 0
     session.press(at: 0)
     XCTAssertEqual(session.cancel(), [])
     XCTAssertEqual(session.tick(at: 1), [])
@@ -106,6 +178,7 @@ final class HoldSessionTests: XCTestCase {
 
   func testRepeatedPressAndReleaseDoNotDuplicateActions() {
     var session = HoldSession()
+    session.releaseDelay = 0
     session.sendEnter = true
     session.press(at: 0)
     session.press(at: 0.1)
@@ -119,6 +192,7 @@ final class HoldSessionTests: XCTestCase {
 
   func testWatchdogStopsWithoutSubmitting() {
     var session = HoldSession()
+    session.releaseDelay = 0
     session.sendEnter = true
     session.press(at: 0)
     _ = session.tick(at: 0.2)
@@ -129,6 +203,7 @@ final class HoldSessionTests: XCTestCase {
 
   func testEnterIsDisabledByDefault() {
     var session = HoldSession()
+    session.releaseDelay = 0
     XCTAssertFalse(session.sendEnter)
     session.press(at: 0)
     _ = session.tick(at: 0.2)
