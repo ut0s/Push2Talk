@@ -4,15 +4,16 @@ import AppKit
 /// A passive status display that never becomes the input target.
 final class StatusPopup {
   enum State: Equatable {
-    case recording, settling
+    case recording, waveform, settling
 
-    var symbol: String { self == .recording ? "mic.fill" : "ellipsis.bubble" }
-    var title: String { self == .recording ? L10n.text("音声入力中") : L10n.text("文字の確定待ち") }
-    var color: NSColor { self == .recording ? .systemRed : .secondaryLabelColor }
+    var symbol: String { self == .settling ? "ellipsis.bubble" : "mic.fill" }
+    var title: String { self == .settling ? L10n.text("文字の確定待ち") : L10n.text("音声入力中") }
+    var color: NSColor { self == .settling ? .secondaryLabelColor : .systemRed }
   }
 
   private let panel: NSPanel
   private let imageView = NSImageView()
+  private let waveformView = RecordingWaveformView()
   private var state: State?
   private var settlingTimer: Timer?
   private var settlingDotCount = 1
@@ -47,23 +48,37 @@ final class StatusPopup {
     imageView.imageScaling = .scaleProportionallyUpOrDown
     imageView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 30, weight: .medium)
     background.addSubview(imageView)
+    waveformView.translatesAutoresizingMaskIntoConstraints = false
+    waveformView.isHidden = true
+    waveformView.setAccessibilityElement(true)
+    waveformView.setAccessibilityRole(.image)
+    background.addSubview(waveformView)
     NSLayoutConstraint.activate([
       imageView.centerXAnchor.constraint(equalTo: background.centerXAnchor),
       imageView.centerYAnchor.constraint(equalTo: background.centerYAnchor),
       imageView.widthAnchor.constraint(equalToConstant: 36),
       imageView.heightAnchor.constraint(equalToConstant: 36),
+      waveformView.centerXAnchor.constraint(equalTo: background.centerXAnchor),
+      waveformView.centerYAnchor.constraint(equalTo: background.centerYAnchor),
+      waveformView.widthAnchor.constraint(equalToConstant: 50),
+      waveformView.heightAnchor.constraint(equalToConstant: 34),
     ])
   }
 
-  func update(_ newState: State?) {
+  func update(_ newState: State?, recordingLevel: CGFloat? = nil) {
     guard let newState else {
       stopSettlingAnimation()
       state = nil
+      waveformView.reset()
       panel.orderOut(nil)
       return
     }
     if state != newState {
       stopSettlingAnimation()
+      waveformView.reset()
+      waveformView.isHidden = newState != .waveform
+      waveformView.setAccessibilityLabel(newState.title)
+      imageView.isHidden = newState == .waveform
       imageView.image = NSImage(
         systemSymbolName: newState.symbol, accessibilityDescription: newState.title)
       imageView.contentTintColor = newState.color
@@ -81,6 +96,9 @@ final class StatusPopup {
         settlingTimer = timer
         RunLoop.main.add(timer, forMode: .common)
       }
+    }
+    if newState == .waveform, let recordingLevel {
+      waveformView.append(recordingLevel)
     }
     guard !panel.isVisible else { return }
     // Pick the screen where the user starts the session, then keep the HUD stationary.
@@ -135,6 +153,34 @@ final class StatusPopup {
 
   deinit {
     settlingTimer?.invalidate()
+  }
+}
+
+private final class RecordingWaveformView: NSView {
+  private static let barCount = 13
+  private var levels = Array(repeating: CGFloat.zero, count: barCount)
+
+  func reset() {
+    levels = Array(repeating: 0, count: Self.barCount)
+    needsDisplay = true
+  }
+
+  func append(_ level: CGFloat) {
+    levels.removeFirst()
+    levels.append(level)
+    needsDisplay = true
+  }
+
+  override func draw(_ dirtyRect: NSRect) {
+    NSColor.systemRed.setFill()
+    let spacing = bounds.width / CGFloat(Self.barCount)
+    let barWidth: CGFloat = 2
+    for (index, level) in levels.enumerated() {
+      let height = barWidth + level * (bounds.height - barWidth)
+      let rect = NSRect(x: (CGFloat(index) + 0.5) * spacing - barWidth / 2,
+        y: bounds.midY - height / 2, width: barWidth, height: height)
+      NSBezierPath(roundedRect: rect, xRadius: barWidth / 2, yRadius: barWidth / 2).fill()
+    }
   }
 }
 
