@@ -1,9 +1,38 @@
+import AppKit
+import Carbon
 import CoreGraphics
 import Push2TalkCore
 import XCTest
 @testable import Push2TalkInput
 
 final class KeyboardBridgeTests: XCTestCase {
+  func testPasteEventsOnlySendCommandV() throws {
+    let events = try XCTUnwrap(KeyboardBridge.pasteEvents())
+    XCTAssertEqual(events.map(\.type), [.keyDown, .keyUp])
+    for event in events {
+      XCTAssertEqual(event.flags, .maskCommand)
+      XCTAssertEqual(event.getIntegerValueField(.keyboardEventKeycode), Int64(kVK_ANSI_V))
+      XCTAssertEqual(event.getIntegerValueField(.eventSourceUserData), KeyboardBridge.marker)
+    }
+  }
+
+  func testPasteboardSnapshotPreservesAllItemsAndRepresentations() throws {
+    let pasteboard = NSPasteboard.withUniqueName()
+    defer { pasteboard.releaseGlobally() }
+    let first = NSPasteboardItem()
+    first.setString("声😀", forType: .string)
+    let customType = NSPasteboard.PasteboardType("com.ut0s.push2talk.test")
+    first.setData(Data([2, 4, 8]), forType: customType)
+    let second = NSPasteboardItem()
+    second.setString("second item", forType: .string)
+    XCTAssertTrue(pasteboard.writeObjects([first, second]))
+    let snapshots = try XCTUnwrap(KeyboardBridge.copyPasteboardItems(pasteboard))
+    pasteboard.clearContents()
+    XCTAssertTrue(pasteboard.writeObjects(snapshots))
+    XCTAssertEqual(pasteboard.pasteboardItems?.map { $0.string(forType: .string) }, ["声😀", "second item"])
+    XCTAssertEqual(pasteboard.pasteboardItems?.first?.data(forType: customType), Data([2, 4, 8]))
+  }
+
   @MainActor
   func testSystemPollingKeepsSessionRecordingWhenShortcutClearsOptionFlags() async {
     for physicalKey in [CGKeyCode(58), CGKeyCode(61)] {

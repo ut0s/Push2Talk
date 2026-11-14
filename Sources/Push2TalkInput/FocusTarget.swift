@@ -9,6 +9,7 @@ struct FocusMetadata {
 struct FocusEnvironment {
   var ownPID: pid_t
   var frontmostPID: () -> pid_t?
+  var bundleIdentifier: (pid_t) -> String? = { _ in nil }
   var focusedElement: (pid_t) -> AXUIElement?
   var metadata: (AXUIElement) -> FocusMetadata
   var text: (AXUIElement) -> String?
@@ -17,6 +18,7 @@ struct FocusEnvironment {
     FocusEnvironment(
       ownPID: ProcessInfo.processInfo.processIdentifier,
       frontmostPID: { NSWorkspace.shared.frontmostApplication?.processIdentifier },
+      bundleIdentifier: { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier },
       focusedElement: { pid in
         let app = AXUIElementCreateApplication(pid)
         AXUIElementSetMessagingTimeout(app, 0.1)
@@ -36,10 +38,12 @@ struct FocusEnvironment {
         _ = AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &subrole)
         var writable = DarwinBoolean(false)
         _ = AXUIElementIsAttributeSettable(element, kAXValueAttribute as CFString, &writable)
+        var selectionWritable = DarwinBoolean(false)
+        _ = AXUIElementIsAttributeSettable(element, kAXSelectedTextAttribute as CFString, &selectionWritable)
         return FocusMetadata(
           isSecure: subrole as? String == "AXSecureTextField",
           isEditable: [kAXTextFieldRole, kAXTextAreaRole, kAXComboBoxRole].contains(role as? String ?? "")
-            || writable.boolValue)
+            || writable.boolValue || selectionWritable.boolValue)
       },
       text: { element in
         var value: CFTypeRef?
@@ -54,6 +58,7 @@ public struct FocusTarget {
   private let pid: pid_t
   private let element: AXUIElement?
   private let initialText: String?
+  public let isEditable: Bool
   private let environment: FocusEnvironment
 
   public var canSubmitAutomatically: Bool { element != nil && initialText != nil }
@@ -64,14 +69,16 @@ public struct FocusTarget {
     guard let pid = environment.frontmostPID(), pid != environment.ownPID else { return nil }
     let element = environment.focusedElement(pid)
     var initialText: String?
+    var isEditable = false
     if let element {
       let metadata = environment.metadata(element)
       guard !metadata.isSecure else { return nil }
       // macOS decides whether native Dictation is available in custom editors.
       // Reading text is only needed to authorize automatic Enter afterward.
-      if metadata.isEditable { initialText = environment.text(element) }
+      isEditable = metadata.isEditable
+      if isEditable { initialText = environment.text(element) }
     }
-    return FocusTarget(pid: pid, element: element, initialText: initialText, environment: environment)
+    return FocusTarget(pid: pid, element: element, initialText: initialText, isEditable: isEditable, environment: environment)
   }
 
   public var isCurrent: Bool {
@@ -81,6 +88,17 @@ public struct FocusTarget {
     guard let element else { return true }
     guard let current else { return false }
     return CFEqual(element, current)
+  }
+
+  public func insertText(_ text: String, using keyboard: KeyboardBridge) -> Bool {
+    guard let element, isEditable, isCurrent else { return false }
+    // The ChatGPT desktop composer does not reflect the existing direct insertion methods.
+    if environment.bundleIdentifier(pid) != "com.openai.codex",
+      AXUIElementSetAttributeValue(element, kAXSelectedTextAttribute as CFString, text as CFString) == .success
+    {
+      return true
+    }
+    return keyboard.pasteText(text, to: pid, ifCurrent: { isCurrent })
   }
 
   public var hasNewText: Bool {

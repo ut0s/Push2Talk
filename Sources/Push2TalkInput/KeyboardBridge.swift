@@ -35,6 +35,7 @@ public final class KeyboardBridge {
   private var eventRunLoop: CFRunLoop?
   private var generation = 0
   private var nextPostTime = ProcessInfo.processInfo.systemUptime
+  private var pasteboardRestoration: (() -> Void)?
 
   public var isRightOptionHeld: Bool { stateLock.withLock { optionState.isHeld } }
   public var optionEventStatus: String {
@@ -233,6 +234,67 @@ public final class KeyboardBridge {
 
   public func stopDictation(ifCurrent: @escaping () -> Bool) { sendKey(53, ifCurrent: ifCurrent) }
   public func sendEnter(ifCurrent: @escaping () -> Bool) { sendKey(36, ifCurrent: ifCurrent) }
+
+  func pasteText(_ text: String, to pid: pid_t, ifCurrent: () -> Bool) -> Bool {
+    guard !text.isEmpty, !secureInputEnabled, AXIsProcessTrusted(), CGPreflightPostEventAccess(),
+      let events = Self.pasteEvents()
+    else { return false }
+    let pasteboard = NSPasteboard.general
+    guard pasteboardRestoration == nil else { return false }
+    let originalCount = pasteboard.changeCount
+    guard let snapshots = Self.copyPasteboardItems(pasteboard), ifCurrent(),
+      !secureInputEnabled, pasteboard.changeCount == originalCount
+    else { return false }
+    pasteboard.clearContents()
+    let written = pasteboard.setString(text, forType: .string)
+    let transcriptCount = pasteboard.changeCount
+    pasteboardRestoration = {
+      // Leave intact any copy operation that happened while the target was pasting.
+      guard pasteboard.changeCount == transcriptCount else { return }
+      pasteboard.clearContents()
+      if !snapshots.isEmpty { pasteboard.writeObjects(snapshots) }
+    }
+    guard written else {
+      restorePasteboard()
+      return false
+    }
+    for event in events { event.postToPid(pid) }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+      self?.restorePasteboard()
+    }
+    return true
+  }
+
+  public func restorePasteboard() {
+    pasteboardRestoration?()
+    pasteboardRestoration = nil
+  }
+
+  static func copyPasteboardItems(_ pasteboard: NSPasteboard) -> [NSPasteboardItem]? {
+    guard let items = pasteboard.pasteboardItems else { return nil }
+    var snapshots: [NSPasteboardItem] = []
+    for item in items {
+      let copy = NSPasteboardItem()
+      for type in item.types {
+        guard let data = item.data(forType: type), copy.setData(data, forType: type) else { return nil }
+      }
+      snapshots.append(copy)
+    }
+    return snapshots
+  }
+
+  static func pasteEvents() -> [CGEvent]? {
+    let source = CGEventSource(stateID: .privateState)
+    var events: [CGEvent] = []
+    for down in [true, false] {
+      guard let event = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: down)
+      else { return nil }
+      event.flags = .maskCommand
+      event.setIntegerValueField(.eventSourceUserData, value: marker)
+      events.append(event)
+    }
+    return events
+  }
 
   private func sendKey(_ key: CGKeyCode, ifCurrent: @escaping () -> Bool) {
     let source = CGEventSource(stateID: .privateState)
