@@ -48,6 +48,42 @@
 }
 ```
 
+<!-- tckt-ticket-numbers
+{
+  "T-0cee345546764d999ffa54c3147a5f50": 17,
+  "T-14e35232cd4048cb9a17a916c424cd5d": 8,
+  "T-209a16ebf8b54f2b940b76d169a01954": 25,
+  "T-269ae59a96f44020a11f3de150cdbb89": 24,
+  "T-315cd46a465a4885b10f70ea7f5d06d2": 30,
+  "T-370d7d065e7542a5b715f39b58a3115d": 7,
+  "T-3d9b4bfad8b2438aa3381365a4e8a38b": 22,
+  "T-452711bf52a945c19acf75fa6ed4530d": 6,
+  "T-493a31ce0cb54156953349fea5ad3283": 13,
+  "T-512d961e31aa45d592e52654192ab544": 10,
+  "T-53d49898e5fa4109bc6b5636fa92215e": 11,
+  "T-546fb53f4d0246518b69740601bda149": 21,
+  "T-5a2c58de4c904b4a95daeb0140cb6fc0": 4,
+  "T-5a6403760c8c4a508e5ac76a3a14f38c": 3,
+  "T-5c76ada8e8844e8b99280c4fcf45ebb5": 1,
+  "T-5cfc4efbcc50437e9c653fcabbb6c8a7": 12,
+  "T-60098e14a72646cabd16f5779520e84c": 26,
+  "T-624c05f14aa64de1a162167730eb1686": 19,
+  "T-625b177ac21f44049cecb87e9971e7c0": 9,
+  "T-660a6570afeb4b719dfb55519984f8cb": 28,
+  "T-665c7aae371e4dc6a4792ac2364b8db3": 27,
+  "T-70b7fb5dddb548049f515f4b6612e3dd": 29,
+  "T-89909cb48f1f4e74a8533050dddb8085": 14,
+  "T-ad1a2ae0a3c84840af305964e1607a2e": 31,
+  "T-bf2bf3ca3ba84c369f5f1f4fa0b6025e": 15,
+  "T-c65a4f1c65f64f8486371a3b822175e6": 2,
+  "T-c7cfb00dd4c44f3294b4b43412d4baa8": 18,
+  "T-d0ce6cada1ee406bb0924c020eabb35b": 20,
+  "T-e05481383d1a437384c5f3484a3180c7": 23,
+  "T-edbbc70c9ea744db89db16346cd764d0": 5,
+  "T-f95839fee12940e08d047c6fe2c1ce24": 16
+}
+-->
+
 ## [DONE] うまく動いていない。
 - ID: T-5c76ada8e8844e8b99280c4fcf45ebb5
 - Archived: true
@@ -982,13 +1018,13 @@ bump:patch のあと、他のプロジェクトを参考にしてコミットも
 
 ## [DONE] AltTabAltからWindowが無いときの表示は消えたが、右Optに反応しなくなっている。FIX
 - ID: T-660a6570afeb4b719dfb55519984f8cb
+- Archived: true
 - Created: 2026-11-02
 - Type: Task
 
 ### Comments
 - 原因調査と修正を実施。設定ウィンドウを閉じた際にPush2Talk（accessoryアプリ）がアクティブ状態のまま保持され、FocusTarget.capture()がownPIDと一致してnilを返し右Option長押しが無視される問題を特定。windowWillCloseでNSApp.hide(nil)を呼び出して直前アプリケーションへ確実にフォーカスを返却するよう改修。全45テスト通過。
 - 右Option押下時に音声入力が始まらずアイコンがバツ（mic.slash）のままになる問題を修正。reconcileHoldStateのポーリングで修飾キーに対してfalseを返しがちなCGEventSource.keyState(61)に依存していたため、長押し判定（180ms）前に即座にリリース処理が呼ばれていた。flagsState(.maskAlternate)と左右修飾ビットを反映した判定に改善。またAppDelegate.holdにおける左Option除外条件を左Option単独押下時のみ除外するよう修正し、動作診断ログとユニットテストを追加。全46テスト通過。
-
 
 ## [DONE] Puaseしているかどうかがわからない。Pauseしている場合は、斜線ではなく一時停止の二重線にしよう。
 - ID: T-70b7fb5dddb548049f515f4b6612e3dd
@@ -1028,4 +1064,247 @@ Bump コマンドにコミットが含まれることがわかるように末尾
 
 ### Comments
 - Bumpの3コマンドに :commit を追加し、関連ドキュメントとスクリプトの案内も更新。mise tasks ls --local、bash -n、git diff --check で確認済み。実際のバージョン更新・コミットは未実行。
+
+## [IN_REVIEW] 時間が経ってから、アプリを起動すると右Optを押した後にすぐアイコンがもとに戻ってしてしまうことがあります。
+- ID: T-ad1a2ae0a3c84840af305964e1607a2e
+- CodexPrompt: 92bc2add527c2be7b73a31b53ea23fd40aba4bc1a4072d01d4e2fee09022589f
+- CodexSession: 4776e625a67ec09660a65b0ff9ceb436ea7ce043ca6c482d0dd97e3b20dea288
+- Created: 2026-11-07
+- Source: Codex
+- Type: Question
+
+```text
+時間が経ってから、アプリを起動すると右Optを押した後にすぐアイコンがもとに戻ってしてしまうことがあります。
+原因を探ってください
+
+音声入力中がどうかをプログラムから確認することはできますか？
+
+```
+
+### Comments
+- 原因調査: アイコンはOS音声入力の実状態ではなく内部phase/右Opt保持状態。FocusTargetは100msのAX取得失敗1回でisCurrent=false、25ms周期tickが即cancelすることを/tmpの現行ソース使用プローブで確認(true→false→true)。放置後の応答遅延との関連は未確定。斜線付きへの復帰は保持解除誤判定/イベントタップ無効化も候補。直近2日ログにアプリ固有診断記録がなく原因確定不可。中断理由とAXエラー/保持解除経路のログ分離を提案。標準Dictationの他アプリ稼働状態を直接取得する公開APIは調査範囲で見つからず、CoreAudioは稼働の補助推定のみ、自前Speech認識タスクならstate取得可。アプリ導入版0.1.3/リポジトリ0.1.4。製品コード変更なし、実機再現なし。
+
+## [IN_REVIEW] Optを話してすぐに音声入力が解除されてしまうため、変換が間に合わないことがある。何とかして
+- ID: T-7f86ab9275a1431a9919f11e89d7451f
+- CodexPrompt: 974dd5bf28f8d3a0761527aac8f153c34dd204be1c23fb31d11183bd1764d3e4
+- CodexSession: 93d6b1749444be5e89424aa534fe5def4a32d99eb49bcf6ce3553a3c9ca237de
+- Created: 2026-11-08
+- Source: Codex
+- Type: Task
+
+```text
+Optを話してすぐに音声入力が解除されてしまうため、変換が間に合わないことがある。何とかして
+
+```
+
+<!-- tckt-subtask:c373b5d0190de9d507c80a848459d168e95db43c1985ee53a216a081405649fe -->
+- [ ] [Task] これも設定可能な時間にして
+
+```text
+これも設定可能な時間にして
+```
+
+### Comments
+- 右Option解放後に初期値0.8秒の停止猶予を追加し、設定画面・クイック設定で0.3〜3秒に調整可能にした。停止後の文字確定待ちとEnter判定を維持し、中断・短時間解放・解放イベント補完の回帰テストを更新。アプリのビルドと全53テスト成功、git diff --check成功（一時ディレクトリで検証）。実際のmacOS音声認識、インストール済みアプリへの反映は未実施。
+- 追加依頼の停止猶予時間は前回の実装ですでに設定可能。設定画面とクイック設定の「キーを離してから終了まで」で0.3・0.5・0.8・1.2・2・3秒を選択し、UserDefaultsへ保存して次回の音声入力開始時に適用する経路を現行ソースで確認。追加のコード変更は不要。インストール済みアプリには未反映。
+
+## [IN_REVIEW] 相談。
+- ID: T-828a841292144009ab3765a8721647a0
+- CodexPrompt: 68f6b97c04b83f58d8335fa58d89b17a1ba0c20ec3703e9ec2c8c5ae2c8ddf5c
+- CodexSession: f3588d85def2c91eb2f36df699ba9420c17d9d825d15a0e8a276f973e9601dda
+- Created: 2026-11-14
+- Source: Codex
+- Type: Discussion
+
+```text
+相談。
+Whisperのようなオープンの音声認識モデルを使用するオプションを追加することは可能でしょうか？
+
+```
+
+<!-- tckt-subtask:8b88d98332e0de22a23becd2a9581f333531002a3a02f438386218d115949cc1 -->
+- [ ] [Question] 日本語と英語をシームレスに切り替え可能ですか？
+
+```text
+日本語と英語をシームレスに切り替え可能ですか？
+
+```
+
+<!-- tckt-subtask:c431603afe931c9c142bd669e8ed4d89ac06830c97c25af31c4592aaac317ceb -->
+- [ ] [Discussion] エンジンの比較を事前にしておきたい
+
+```text
+エンジンの比較を事前にしておきたい
+
+```
+
+<!-- tckt-subtask:12472c3800d92009f37c4f53ea3175c56efb609debc227abfe76ed3d1a327929 -->
+- [ ] [Task] では、3エンジンすべて使用可能にしましょう。
+
+```text
+では、3エンジンすべて使用可能にしましょう。
+
+その代わり不要なモデルデータをユーザが削除できるようにする。
+WhiperのMLX実装はありますか？
+
+```
+
+<!-- tckt-subtask:a0b839621b2fe37c2e7aa6cbe1e53ad7c7534048aa70a75542ebaef9e87fe63c -->
+- [ ] [Task] Whisper は MLX 実装を使用して
+
+```text
+Whisper は MLX 実装を使用して
+
+```
+
+<!-- tckt-subtask:a0f5192814ee82e1fc62dd3e4bf1d67839714c5994772e3408db3a2e7a03811c -->
+- [ ] [Task] VLLM\_NO\_USAGE\_STATS=1 で無効化
+
+```text
+VLLM_NO_USAGE_STATS=1 で無効化
+
+```
+
+<!-- tckt-subtask:e40c690e24d320ae0c4fd931f8f7321d351790fd26a986937888bb079563eab6 -->
+- [ ] [Task] Qwen/Qwen3-ASR-1.7B-hf も使用できるようにして
+
+```text
+Qwen/Qwen3-ASR-1.7B-hf も使用できるようにして
+
+```
+
+<!-- tckt-subtask:0c2935cb7db6223eb310c22cf027f365e01b2dea5b39e26102b9ee8b4cce5e07 -->
+- [ ] [Question] MLXのモデルでは無いということ？
+
+```text
+MLXのモデルでは無いということ？
+
+```
+
+<!-- tckt-subtask:d32316291e2931b355ec2c512b39a4e9d6af7b3caeb07a8c3183567fb7591808 -->
+- [ ] [Task] 1.7B の MLX 版を選択できるようにしてください
+
+```text
+1.7B の MLX 版を選択できるようにしてください
+
+```
+
+### Comments
+- 設計相談として現行のキー監視・入力先確認・Universal配布と上流資料を確認。標準音声入力を既定に、whisper.cppと多言語baseを初回取得するローカルモードを提案。アプリで録音し、キー解放後に文字起こしし、元の入力欄への挿入を確認後に設定に応じてEnterを送る案。macOS 13/Intelでの配布適合性と日本語の精度・遅延は実機検証事項。
+- 日英の発話単位切替と発話内混在を分けて調査。whisper.cppのautoは1回の認識で言語を1つ選ぶ。現行macOS標準を基準に、多言語Whisper base/smallとApple Silicon上のQwen3-ASR 0.6Bを比較候補とした。日本語のみ・英語のみ・交互・混在・無音で誤認識、英語固有名詞の保持、解放後の遅延を測る案。今回は資料比較で実機ベンチは未実施。
+- macOS標準（既定）、Whisper（Appleのmlx-whisper、多言語base/small）、Qwen3-ASR（MLX、0.6B）を実装。モデル別ダウンロード・SHA-256確認・個別削除、録音と入力先の確認、認識後のEnter制御を追加。33テストとUniversalビルド・アドホック署名を検証。Apple M4で両MLX CLIの日英の実モデル文字起こしを確認。アプリUIでのマイク許可から他アプリ挿入までの通し操作は未検証。
+- ローカル音声認識の子プロセスへ VLLM_NO_USAGE_STATS=1 を明示的に渡す設定を追加。vLLM の利用統計用の変数で、現行の MLX 経路は vLLM を起動しないことを確認。Swift テスト33件と git diff --check が通過。
+- 公式 Qwen/Qwen3-ASR-1.7B-hf（約4.09 GB）を Transformers/PyTorch で追加。既存0.6B MLXと切替、モデル個別の取得・SHA-256照合・削除に対応。公式ファイルのサイズとハッシュ、uvでの導入、Apple M4で日英のオフライン文字起こし、Swiftテスト33件とUniversalビルドを確認。アプリ画面からの通し操作は未検証。
+- 公式 1.7B-hf は Transformers 向けで、現行実装は PyTorch MPS を利用。1.7B の MLX 量子化版は別配布であり、既存の MLX ランタイムで使える候補があることを公式モデルカードと配布元で確認。
+- Qwen3-ASR 1.7B MLX（4-bit、約1.31 GB）を設定に追加。0.6Bと同じランタイムで実行し、保存した選択を復元。個別ダウンロード・SHA-256照合・削除に対応。Apple M4で実モデルの日英オフライン文字起こし、Swiftテスト33件、git diff --checkを確認。アプリ画面の通し操作は未検証。
+
+## [IN_REVIEW] 音声入力中のUIとして、Whiperなどのモデルを使用している場合は、音声入力の権限を付与する必要があると思うのでAudio波形を表示するようにして
+- ID: T-3c834d42bf4f409fb778537ded085a76
+- CodexPrompt: e38e32ddfc87b59849cb46d235fc16e99e93f559cc108cb54ad0f4495d27339c
+- CodexSession: 168fa69db490fe3aa3c89df0d993d4f123ccac8567f04a306c18d461b05d1b58
+- Created: 2026-11-14
+- Source: Codex
+- Type: Task
+
+```text
+音声入力中のUIとして、Whiperなどのモデルを使用している場合は、音声入力の権限を付与する必要があると思うのでAudio波形を表示するようにして
+
+```
+
+### Comments
+- Whisper・Qwen3-ASRの録音ポップアップに既存録音の音量に連動する波形を追加。録音後は確定待ち表示に切り替わります。ビルドと既存55テストは成功、実マイクと表示の目視確認は未実施です。
+
+## [IN_REVIEW] エンジンの導入は出来たが、音声入力されてない。
+- ID: T-05099b0b857a48a8aebcbe957bad3540
+- CodexPrompt: 5e0752c79a4b190ac17eac0b4d955dbb8c5186144b348959b7895c37f13977fe
+- CodexSession: 6d59e5c6b5515145fff98e757eb0f99ad7da4395245b5f36a2caffbd438aa8b7
+- Created: 2026-11-14
+- Source: Codex
+- Type: Task
+
+```text
+エンジンの導入は出来たが、音声入力されてない。
+どちらのエンジンでもNGだった。
+
+```
+
+<!-- tckt-subtask:fa188ffce02aad9e10e81cf9cff7c6e4613ec610073680460aee3da37ca86513 -->
+- [ ] [Question] リアルタイム入力はできますか？
+
+```text
+リアルタイム入力はできますか？
+
+```
+
+<!-- tckt-subtask:e75c47aba981b982e13536d8ffb3911bdd90f43994fbfc942f3d4060c2787322 -->
+- [ ] [Task] テキストが出力されません
+
+```text
+テキストが出力されません
+
+```
+
+<!-- tckt-subtask:fee9eff9b1098454fefc55175c1ea9da0fa5f91b1d8650a16ba7da3d68969cee -->
+- [ ] [Task] 表示されていないです
+
+```text
+表示されていないです
+
+ChatGPT デスクトップアプリです
+
+```
+
+<!-- tckt-subtask:cbff60bd871cf901cc84c532d758bfeb769b5d03d774f38d4b7f4a8d5787f633 -->
+- [ ] [Task] OK
+
+```text
+OK
+
+DONE
+
+```
+
+### Comments
+- 試行時のCore Audioログで録音開始・停止を確認。導入済みWhisper smallとQwen3-ASR 1.7B MLXはアプリと同じ引数で日本語合成音声を文字起こしできた。共通の文字挿入経路を修正する。
+- ローカルエンジン共通の文字挿入を修正。AXSelectedTextで書けない場合に同じ入力欄を再確認して文字イベントを送信し、認識結果が空の場合は状態を表示。現行の2モデルで合成音声の認識確認、Swiftテスト56件成功、署名済み修正版の /Applications への更新とバイナリ一致を確認。実際のマイク発話から対象入力欄への挿入と、元の失敗箇所の特定は未確認。
+- 現行のローカル版は右Optionを離し録音を止めてから一括認識・挿入する。発話中の逐次入力はmacOS標準音声入力で利用可能。ローカルの逐次入力には追加実装が必要で、導入済みQwen3-ASR MLXには実験的なマイクストリーミングがある。
+- 再試行時はマイク許可後に録音開始・停止とPython認識プロセスの起動・終了を確認。操作ログのみ採取する診断付きでアプリを再起動し、発話後の認識結果と挿入を切り分けるため再試行を依頼。
+- 23:04の再試行でWhisperの録音開始、右Option解放、ローカル認識の開始と非空の結果の挿入APIへの送信を診断ログで確認。画面に表示されたかと、未表示の場合の対象アプリ・入力欄を確認中。
+- ChatGPTデスクトップの入力欄には認識結果が表示されないと確認。対象アプリでは元のフォーカスを再確認して⌘Vでペーストし、クリップボードの全表現を復元するよう変更。Swiftテスト57件成功、修正版をインストールして診断付きで起動。対象入力欄で再確認待ち。
+- 更新直後の起動でアクセシビリティ・入力監視・キー送信が未許可と判定され、右Optionを受信できない。macOSの設定で権限を付け直してからChatGPT入力欄で確認する必要があるため、IN_PROGRESSを維持。
+- ChatGPTデスクトップの音声入力修正についてユーザーから「OK / DONE」の確認を受領。
+
+## [DONE] メニューバーの中ににアプリのRestartを追加して
+- ID: T-a19d89cc7e2c48c186f79d13f8f2bd62
+- Archived: true
+- CodexArchivedSession: 0d394d352d6d2fb8eb62365e8cd12423fda2061c8efbf52b29ea786549edf050
+- CodexPrompt: c0b715443b1f8a062ce4aee138d48467d73538a2142203afeebb8a68fed522d3
+- CodexSession: 0d394d352d6d2fb8eb62365e8cd12423fda2061c8efbf52b29ea786549edf050
+- Created: 2026-11-14
+- Source: Codex
+- Type: Task
+
+```text
+メニューバーの中ににアプリのRestartを追加して
+
+```
+
+### Comments
+- 終了の直上に日英対応の再起動項目を追加。ビルド成功、57件中56件成功。既存のペーストボードテスト1件が失敗。メニューからの実操作は未確認。
+
+## [IN_REVIEW] brew の依存DLで追加エンジンに必要なものをインストールすることはできますか？
+- ID: T-2755b7bf6836408db30a3b36837d1b24
+- CodexPrompt: ae30d2338039a6bce114eda344f6d81bc4c6bf44e277d96b73db662f1463e382
+- CodexSession: 0c133e544cbb7fdeecc56c3c4b02de5ec6ff3e9eada55f94ef0a396ebbb08f3f
+- Created: 2026-11-14
+- Source: Codex
+- Type: Question
+
+```text
+brew の依存DLで追加エンジンに必要なものをインストールすることはできますか？
+
+```
+
+### Comments
+- 公開 tap の HEAD と cask 生成定義、LocalSpeech.swift、Homebrew 公式仕様を確認。uv・ffmpeg・Python は formula 依存で導入可能。Python パッケージまで一括導入する案は tap にエンジン別 formula を追加し、モデルは既存のアプリ内ダウンロードを利用する。公開 cask 0.1.4 の依存は macOS のみ。
 
