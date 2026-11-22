@@ -9,7 +9,6 @@ struct FocusMetadata {
 struct FocusEnvironment {
   var ownPID: pid_t
   var frontmostPID: () -> pid_t?
-  var bundleIdentifier: (pid_t) -> String? = { _ in nil }
   var focusedElement: (pid_t) -> AXUIElement?
   var metadata: (AXUIElement) -> FocusMetadata
   var text: (AXUIElement) -> String?
@@ -18,7 +17,6 @@ struct FocusEnvironment {
     FocusEnvironment(
       ownPID: ProcessInfo.processInfo.processIdentifier,
       frontmostPID: { NSWorkspace.shared.frontmostApplication?.processIdentifier },
-      bundleIdentifier: { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier },
       focusedElement: { pid in
         let app = AXUIElementCreateApplication(pid)
         AXUIElementSetMessagingTimeout(app, 0.1)
@@ -91,13 +89,7 @@ public struct FocusTarget {
   }
 
   public func insertText(_ text: String, using keyboard: KeyboardBridge) -> Bool {
-    guard let element, isEditable, isCurrent else { return false }
-    // The ChatGPT desktop composer does not reflect the existing direct insertion methods.
-    if environment.bundleIdentifier(pid) != "com.openai.codex",
-      AXUIElementSetAttributeValue(element, kAXSelectedTextAttribute as CFString, text as CFString) == .success
-    {
-      return true
-    }
+    guard isEditable, isCurrent else { return false }
     return keyboard.pasteText(text, to: pid, ifCurrent: { isCurrent })
   }
 
