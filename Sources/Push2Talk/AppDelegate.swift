@@ -517,7 +517,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     statusItem.button?.attributedTitle = NSAttributedString(
       string: displaySymbol == "mic.fill" ? settings.recordingText.menuBarTitle : "",
       attributes: [.foregroundColor: NSColor.systemRed])
-    statusItem.button?.toolTip = "Push2Talk: \(title)"
     let popupState: StatusPopup.State?
     var recordingLevel: CGFloat?
     if !paused && settings.statusDisplayMode.showsPopup && symbol != "mic.slash" {
