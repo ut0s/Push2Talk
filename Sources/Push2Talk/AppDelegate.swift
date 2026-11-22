@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   private var modelStatus: [SpeechModel: String] = [:]
   private var modelButtons: [SpeechModel: NSButton] = [:]
   private var modelLabels: [SpeechModel: NSTextField] = [:]
+  private var legacyQwenModelRow: NSStackView?
   private var speechRuntimeStatus: NSTextField?
   private var systemShortcutSection: NSView?
   private var microphoneButton: NSButton?
@@ -713,7 +714,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let qwenPicker = NSPopUpButton()
     settingsControls["qwenModel"] = qwenPicker
     for (model, title): (SpeechModel, String) in [
-      (.qwen06, "0.6B (MLX)"), (.qwen17MLX, "1.7B (MLX, 4-bit)"), (.qwen17HF, "1.7B-hf (Transformers)"),
+      (.qwen06, "0.6B (MLX)"), (.qwen17MLX, "1.7B (MLX, 4-bit)"),
     ] {
       qwenPicker.addItem(withTitle: title)
       qwenPicker.lastItem?.representedObject = model.rawValue
@@ -736,6 +737,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       row.alignment = .centerY
       row.spacing = 16
       layout.fullWidth(row, in: models)
+      if model == .qwen17HF { legacyQwenModelRow = row }
     }
     refreshModelControls()
   }
@@ -756,11 +758,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         ? L10n.text("必要なランタイム: uv tool install --python 3.12 mlx-whisper==0.4.3 / brew install ffmpeg")
         : L10n.text("ローカルで文字起こしします。認識言語は発話ごとに自動判定します。")
     case .qwen:
-      let runtime = settings.qwenModel == .qwen17HF
-        ? "必要なランタイム: uv tool install --python 3.12 --with torch transformers==5.23.0"
-        : "必要なランタイム: uv tool install --python 3.12 mlx-qwen3-asr==0.4.4"
       speechRuntimeStatus.stringValue = settings.qwenModel.executable == nil
-        ? L10n.text(runtime)
+        ? L10n.text("必要なランタイム: uv tool install --python 3.12 mlx-qwen3-asr==0.4.4")
         : L10n.text("ローカルで文字起こしします。認識言語は発話ごとに自動判定します。")
     }
     let microphoneStatus = AVCaptureDevice.authorizationStatus(for: .audio)
@@ -772,11 +771,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     for model in SpeechModel.allCases {
       let working = modelOperations.contains(model)
       let exists = FileManager.default.fileExists(atPath: model.directory.path)
+      if model == .qwen17HF { legacyQwenModelRow?.isHidden = !exists }
       let status = modelStatus[model] ?? (model.installed ? L10n.text("ダウンロード済み") : L10n.text("未ダウンロード"))
       modelLabels[model]?.stringValue = "\(model.title) — \(status)"
       let button = modelButtons[model]
       button?.title = exists ? L10n.text("削除…") : L10n.text("ダウンロード")
-      button?.isEnabled = !working && (exists || model.engine.supported)
+      button?.isEnabled = !working && (exists || (model.isSelectable && model.engine.supported))
     }
   }
 
@@ -800,7 +800,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
   @objc private func changeQwenModel(_ sender: NSPopUpButton) {
     guard let value = sender.selectedItem?.representedObject as? String,
-      let model = SpeechModel(rawValue: value), model.engine == .qwen
+      let model = SpeechModel(rawValue: value), model.engine == .qwen, model.isSelectable
     else { return }
     cancel()
     localError = nil
@@ -837,7 +837,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       refreshModelControls()
       let confirmation = NSAlert()
       confirmation.messageText = L10n.format("%@ を削除しますか？", model.title)
-      confirmation.informativeText = L10n.text("モデルは後からダウンロードできます。")
+      if model.isSelectable {
+        confirmation.informativeText = L10n.text("モデルは後からダウンロードできます。")
+      }
       confirmation.addButton(withTitle: L10n.text("キャンセル"))
       confirmation.addButton(withTitle: L10n.text("削除"))
       confirmation.beginSheetModal(for: settingsWindow) { [weak self] response in
@@ -857,7 +859,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
           self.modelStatus[model] = L10n.text("削除に失敗しました")
         }
       }
-    } else if model.engine.supported {
+    } else if model.isSelectable && model.engine.supported {
       modelOperations.insert(model)
       modelStatus[model] = L10n.text("ダウンロード中…")
       refreshModelControls()
@@ -888,6 +890,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     settingsControls.removeAll()
     modelButtons.removeAll()
     modelLabels.removeAll()
+    legacyQwenModelRow = nil
     speechRuntimeStatus = nil
     systemShortcutSection = nil
     microphoneButton = nil

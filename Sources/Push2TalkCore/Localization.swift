@@ -62,7 +62,6 @@ public enum L10n {
     "マイクを許可": "Allow Microphone",
     "マイクのシステム設定を開く": "Open Microphone Settings",
     "Qwen3-ASR モデル": "Qwen3-ASR model",
-    "必要なランタイム: uv tool install --python 3.12 --with torch transformers==5.23.0": "Required runtime: uv tool install --python 3.12 --with torch transformers==5.23.0",
     "Whisper モデル": "Whisper model",
     "モデルデータ": "Model data",
     "macOS の音声入力設定を使用します。": "Uses the macOS Dictation settings.",

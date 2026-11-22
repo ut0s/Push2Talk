@@ -55,7 +55,7 @@ final class Settings {
       guard let value = defaults.string(forKey: "qwenModel"),
         let model = SpeechModel(rawValue: value), model.engine == .qwen
       else { return .qwen06 }
-      return model
+      return model.isSelectable ? model : .qwen17MLX
     }
     set { defaults.set(newValue.rawValue, forKey: "qwenModel") }
   }

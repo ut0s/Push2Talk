@@ -24,10 +24,9 @@ The interface supports English and Japanese. By default it follows your macOS la
 brew install uv ffmpeg
 uv tool install --python 3.12 mlx-whisper==0.4.3
 uv tool install --python 3.12 mlx-qwen3-asr==0.4.4
-uv tool install --python 3.12 --with torch transformers==5.23.0
 ```
 
-WhisperだけがFFmpegを使用します。必要なランタイムをインストールしたら、設定でエンジンを選び、マイクへのアクセスを許可し、「モデルデータ」から使用するモデルをダウンロードします。Whisperは多言語のbase（約144 MB）とsmall（約481 MB）、Qwen3-ASRには0.6B（MLX、約542 MB）、1.7B（MLX、4-bit、約1.31 GB）、公式の`Qwen/Qwen3-ASR-1.7B-hf`（Transformers、約4.09 GB）があり、「Qwen3-ASR モデル」で切り替えます。1.7B-hfはPyTorchのMPSで実行し、利用できない場合はCPUで実行します。モデルごとの「削除…」でPush2Talkがダウンロードしたデータを取り除き、必要になれば再取得できます。
+WhisperだけがFFmpegを使用します。必要なランタイムをインストールしたら、設定でエンジンを選び、マイクへのアクセスを許可し、「モデルデータ」から使用するモデルをダウンロードします。Whisperは多言語のbase（約144 MB）とsmall（約481 MB）、Qwen3-ASRは0.6B（MLX、約542 MB）と1.7B（MLX、4-bit、約1.31 GB）を選べます。モデルごとの「削除…」でPush2Talkがダウンロードしたデータを取り除けます。以前にダウンロードした1.7B-hfも「モデルデータ」から削除できます。
 
 ローカルエンジンでは右Optionを離したあとの待ち時間が過ぎると録音を止め、Mac内で文字起こしします。アプリを問わず、アクセシビリティで編集可能と判断できる元の入力欄にフォーカスがあることを再確認し、クリップボード経由でペーストします。ペースト後は元のクリップボードを復元し、その間に新しくコピーされた場合は新しい内容を保持します。ローカル処理中の音声と認識結果は権限を制限した一時フォルダに置き、処理終了時に削除します。
 

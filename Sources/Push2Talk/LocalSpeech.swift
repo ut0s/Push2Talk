@@ -59,6 +59,8 @@ enum SpeechEngine: String, CaseIterable {
 enum SpeechModel: String, CaseIterable {
   case base, small, qwen06, qwen17MLX, qwen17HF
 
+  var isSelectable: Bool { self != .qwen17HF }
+
   var title: String {
     switch self {
     case .base: return "Whisper base · 144 MB"
