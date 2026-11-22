@@ -9,8 +9,8 @@ enum SpeechEngine: String, CaseIterable {
   var title: String {
     switch self {
     case .system: return L10n.text("macOS 標準音声入力")
-    case .whisper: return "Whisper (MLX)"
-    case .qwen: return "Qwen3-ASR"
+    case .whisper: return L10n.text("Whisper (MLX)（実験的）")
+    case .qwen: return L10n.text("Qwen3-ASR（実験的）")
     }
   }
 

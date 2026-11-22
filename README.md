@@ -1,6 +1,6 @@
 # Push2Talk
 
-右Optionの長押しで音声入力するmacOS専用のメニューバーアプリです。macOS 13以降で標準音声入力を利用できます。macOS 14以降のApple SiliconではWhisper（MLX）とQwen3-ASRも選べます。
+右Optionの長押しで音声入力するmacOS専用のメニューバーアプリです。macOS 13以降で標準音声入力を利用できます。macOS 14以降のApple SiliconではWhisper（MLX）とQwen3-ASRも選べます（実験的機能 / Experimental）。
 
 ## 表示言語 / Display Language
 
@@ -18,7 +18,7 @@ The interface supports English and Japanese. By default it follows your macOS la
 
 ## 認識エンジンとモデル
 
-設定 → 音声入力 → 認識エンジンから切り替えられます。macOS標準は初期設定で、追加ランタイムは不要です。ローカル認識を使うには、macOS 14以降のApple Silicon Macで、使用するモデルに応じてランタイムをインストールしてください。
+Whisper（MLX）とQwen3-ASRなどのローカル音声認識機能は実験的（Experimental）です。設定 → 音声入力 → 認識エンジンから切り替えられます。macOS標準は初期設定で、追加ランタイムは不要です。ローカル認識を使うには、macOS 14以降のApple Silicon Macで、使用するモデルに応じてランタイムをインストールしてください。
 
 ```sh
 brew install uv ffmpeg

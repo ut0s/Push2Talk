@@ -48,6 +48,8 @@ public enum L10n {
   // Japanese source strings are the stable lookup keys and the Japanese translations.
   static let english: [String: String] = [
     "macOS 標準音声入力": "macOS Dictation",
+    "Whisper (MLX)（実験的）": "Whisper (MLX) (Experimental)",
+    "Qwen3-ASR（実験的）": "Qwen3-ASR (Experimental)",
     "認識エンジン": "Recognition engine",
     "書き込み可能な入力欄を選んでください": "Select an editable text field",
     "音声入力の設定でランタイムとモデルを確認してください": "Check the runtime and model in Dictation settings",
