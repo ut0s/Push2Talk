@@ -192,6 +192,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     cancel()
     statusPopup.update(nil)
     keyboard.restorePasteboard()
+    keyboard.cancelQueuedKeyStrokesAndRelease()
     keyboard.stop()
     timer?.invalidate()
     permissionsTimer?.invalidate()
@@ -407,6 +408,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   }
 
   @objc private func checkPermissions() {
+    keyboard.retryKeyRelease()
     let accessibilityGranted = AXIsProcessTrusted()
     // Let the filtering tap initiate OS authorization even when posting preflight is false.
     if !accessibilityGranted {
@@ -987,6 +989,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     guard !isRestarting else { return }
     isRestarting = true
     restartNotice?.orderOut(nil)
+    keyboard.cancelQueuedKeyStrokesAndRelease()
     cancel()
     keyboard.stop()
     // Use a new process identity so MenuBarAgent does not retain an invalid scene after exec.

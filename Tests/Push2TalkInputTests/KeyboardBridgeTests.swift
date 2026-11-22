@@ -189,20 +189,61 @@ final class KeyboardBridgeTests: XCTestCase {
   }
 
   @MainActor
-  func testUnknownPhysicalMappingWaitsForNativeRelease() async {
+  func testUnknownPhysicalMappingRecoversReleaseWhenBothOptionKeysAreUp() async {
     for bothDown in [false, true] {
       let bridge = KeyboardBridge()
-      let released = expectation(description: "Native release delivered")
-      bridge.onHold = { down, _ in if !down { released.fulfill() } }
+      let released = expectation(description: "Recovered release delivered")
+      bridge.onHold = { down, shiftHeld in
+        if !down {
+          XCTAssertTrue(shiftHeld)
+          released.fulfill()
+        }
+      }
       _ = bridge.handle(.flagsChanged, event(key: 61, flags: .maskAlternate))
       bridge.reconcileHoldState(rightOptionDown: bothDown, leftOptionDown: bothDown, shiftHeld: false)
-      bridge.reconcileHoldState(rightOptionDown: false, leftOptionDown: false, shiftHeld: false)
       XCTAssertTrue(bridge.isRightOptionHeld)
-      _ = bridge.handle(.flagsChanged, event(key: 61))
+      if bothDown {
+        bridge.reconcileHoldState(rightOptionDown: false, leftOptionDown: true, shiftHeld: false)
+        XCTAssertTrue(bridge.isRightOptionHeld)
+      }
+      bridge.reconcileHoldState(rightOptionDown: false, leftOptionDown: false, shiftHeld: true)
       await fulfillment(of: [released], timeout: 1)
       XCTAssertFalse(bridge.isRightOptionHeld)
       bridge.stop()
     }
+  }
+
+  @MainActor
+  func testReleaseForRestartClearsPostedModifierAndCancelsQueuedStrokes() async {
+    let postedDown = expectation(description: "First modifier press")
+    var allowRelease = false
+    var posted: [CGEvent] = []
+    let bridge = KeyboardBridge(stateSource: .system, postEvent: { event in
+      if event.flags.isEmpty && !allowRelease { return false }
+      posted.append(event)
+      if posted.count == 1 { postedDown.fulfill() }
+      return true
+    })
+    bridge.startDictation(.rightCommand, ifCurrent: { true })
+    bridge.sendEnter(ifCurrent: { true })
+    await fulfillment(of: [postedDown], timeout: 1)
+
+    bridge.cancelQueuedKeyStrokesAndRelease()
+    XCTAssertEqual(posted.count, 1)
+    allowRelease = true
+    bridge.cancelQueuedKeyStrokesAndRelease()
+
+    XCTAssertEqual(posted.map(\.type), [.flagsChanged, .flagsChanged])
+    XCTAssertEqual(posted.map { $0.getIntegerValueField(.keyboardEventKeycode) }, [54, 54])
+    XCTAssertEqual(posted.map(\.flags), [CGEventFlags(rawValue: 0x100010), []])
+    XCTAssertTrue(posted.allSatisfy { $0.getIntegerValueField(.eventSourceUserData) == KeyboardBridge.marker })
+
+    bridge.stopDictation(ifCurrent: { true })
+    let drained = expectation(description: "Cancelled deadlines passed")
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { drained.fulfill() }
+    await fulfillment(of: [drained], timeout: 1)
+    XCTAssertEqual(posted.map(\.type), [.flagsChanged, .flagsChanged, .keyDown, .keyUp])
+    XCTAssertEqual(posted.map { $0.getIntegerValueField(.keyboardEventKeycode) }, [54, 54, 53, 53])
   }
 
   @MainActor

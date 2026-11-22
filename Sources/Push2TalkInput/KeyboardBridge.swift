@@ -16,10 +16,14 @@ struct KeyboardStateSource {
 
 public final class KeyboardBridge {
   private let stateSource: KeyboardStateSource
+  private let postEvent: (CGEvent) -> Bool
 
   public convenience init() { self.init(stateSource: .system) }
 
-  init(stateSource: KeyboardStateSource) { self.stateSource = stateSource }
+  init(stateSource: KeyboardStateSource, postEvent: @escaping (CGEvent) -> Bool = KeyboardBridge.postHIDEvent) {
+    self.stateSource = stateSource
+    self.postEvent = postEvent
+  }
   static let marker: Int64 = 0x5032_5441_4C4B
   public var onHold: ((_ down: Bool, _ shiftHeld: Bool) -> Void)?
   public var onCancel: ((Bool) -> Void)?
@@ -34,7 +38,11 @@ public final class KeyboardBridge {
   private var eventThread: Thread?
   private var eventRunLoop: CFRunLoop?
   private var generation = 0
+
+  // Synthetic key strokes and their release are managed on the main thread.
   private var nextPostTime = ProcessInfo.processInfo.systemUptime
+  private var postGeneration = 0
+  private var pendingKeyUp: CGEvent?
   private var pasteboardRestoration: (() -> Void)?
 
   public var isRightOptionHeld: Bool { stateLock.withLock { optionState.isHeld } }
@@ -67,11 +75,14 @@ public final class KeyboardBridge {
         }
         return false
       }
-      // Posted shortcuts overwrite HID modifier flags even while the physical
-      // key stays down. Only poll the physical key identified for this hold.
-      // If it cannot be identified, keep relying on native release events.
-      guard let physicalOptionKey else { return false }
-      let down = physicalOptionKey == .right ? rightOptionDown : leftOptionDown
+      // A remap can make either physical Option key drive this hold. If the
+      // initial sample was ambiguous, wait until both keys are up.
+      let down: Bool
+      switch physicalOptionKey {
+      case .right: down = rightOptionDown
+      case .left: down = leftOptionDown
+      case nil: down = rightOptionDown || leftOptionDown
+      }
       guard !down else { return false }
       optionState.reset()
       self.physicalOptionKey = nil
@@ -219,15 +230,12 @@ public final class KeyboardBridge {
 
   public func startDictation(_ trigger: DictationTrigger, ifCurrent: @escaping () -> Bool) {
     let source = CGEventSource(stateID: .privateState)
-    // Keep each sequence balanced and serialize cancellation behind an in-flight sequence.
     let base = max(nextPostTime, ProcessInfo.processInfo.systemUptime)
-    for (offset, down) in [(0.0, true), (0.035, false), (0.09, true), (0.125, false)] {
-      guard
-        let event = CGEvent(keyboardEventSource: source, virtualKey: trigger.keyCode, keyDown: down)
-      else { continue }
-      event.type = .flagsChanged
-      event.flags = down ? CGEventFlags(rawValue: trigger.flag.rawValue | trigger.deviceFlag) : []
-      post(event, at: base + offset, condition: down ? ifCurrent : { true })
+    let flags = CGEventFlags(rawValue: trigger.flag.rawValue | trigger.deviceFlag)
+    for offset in [0.0, 0.09] {
+      scheduleKeyStroke(
+        trigger.keyCode, source: source, modifier: flags, at: base + offset,
+        duration: 0.035, ifCurrent: ifCurrent)
     }
     nextPostTime = base + 0.16
   }
@@ -299,23 +307,64 @@ public final class KeyboardBridge {
   private func sendKey(_ key: CGKeyCode, ifCurrent: @escaping () -> Bool) {
     let source = CGEventSource(stateID: .privateState)
     let base = max(nextPostTime, ProcessInfo.processInfo.systemUptime)
-    for (offset, down) in [(0.0, true), (0.025, false)] {
-      guard let event = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: down) else {
-        continue
-      }
-      event.flags = []
-      post(event, at: base + offset, condition: down ? ifCurrent : { true })
-    }
+    scheduleKeyStroke(key, source: source, at: base, duration: 0.025, ifCurrent: ifCurrent)
     nextPostTime = base + 0.05
   }
 
-  private func post(_ event: CGEvent, at time: Double, condition: @escaping () -> Bool) {
-    event.setIntegerValueField(.eventSourceUserData, value: Self.marker)
-    DispatchQueue.main.asyncAfter(
-      deadline: .now() + max(0, time - ProcessInfo.processInfo.systemUptime)
-    ) {
-      guard AXIsProcessTrusted(), CGPreflightPostEventAccess(), condition() else { return }
-      event.post(tap: .cghidEventTap)
+  // Call on the main thread before stopping the keyboard monitor for a restart.
+  public func cancelQueuedKeyStrokesAndRelease() {
+    postGeneration += 1
+    nextPostTime = ProcessInfo.processInfo.systemUptime
+    _ = releasePostedKey()
+  }
+
+  public func retryKeyRelease() {
+    guard ProcessInfo.processInfo.systemUptime >= nextPostTime else { return }
+    _ = releasePostedKey()
+  }
+
+  private func scheduleKeyStroke(
+    _ key: CGKeyCode, source: CGEventSource?, modifier: CGEventFlags? = nil,
+    at time: Double, duration: Double, ifCurrent: @escaping () -> Bool
+  ) {
+    guard
+      let keyDown = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: true),
+      let keyUp = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: false)
+    else { return }
+    if modifier != nil {
+      keyDown.type = .flagsChanged
+      keyUp.type = .flagsChanged
     }
+    keyDown.flags = modifier ?? []
+    keyUp.flags = []
+    for event in [keyDown, keyUp] {
+      event.setIntegerValueField(.eventSourceUserData, value: Self.marker)
+    }
+
+    let expectedGeneration = postGeneration
+    let start = DispatchTime.now() + max(0, time - ProcessInfo.processInfo.systemUptime)
+    DispatchQueue.main.asyncAfter(deadline: start) { [weak self] in
+      guard let self, self.postGeneration == expectedGeneration,
+        self.releasePostedKey(), ifCurrent(), self.postEvent(keyDown)
+      else { return }
+      self.pendingKeyUp = keyUp
+    }
+    DispatchQueue.main.asyncAfter(deadline: start + duration) { [weak self] in
+      guard let self, self.postGeneration == expectedGeneration, self.pendingKeyUp === keyUp else { return }
+      _ = self.releasePostedKey()
+    }
+  }
+
+  private func releasePostedKey() -> Bool {
+    guard let pendingKeyUp else { return true }
+    guard postEvent(pendingKeyUp) else { return false }
+    self.pendingKeyUp = nil
+    return true
+  }
+
+  private static func postHIDEvent(_ event: CGEvent) -> Bool {
+    guard AXIsProcessTrusted(), CGPreflightPostEventAccess() else { return false }
+    event.post(tap: .cghidEventTap)
+    return true
   }
 }
